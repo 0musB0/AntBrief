@@ -1,14 +1,6 @@
 var AD_CLIENT = "ca-pub-4554703495384988";
 var AD_SLOTS = { top: "", bottom: "" };
 
-if (AD_CLIENT) {
-  var s = document.createElement("script");
-  s.async = true;
-  s.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=" + AD_CLIENT;
-  s.crossOrigin = "anonymous";
-  document.head.appendChild(s);
-}
-
 function adSlot(pos){
   if (!AD_CLIENT || !AD_SLOTS[pos]) return "";
   return '<div class="ad-slot"><ins class="adsbygoogle" style="display:block" data-ad-client="'
@@ -97,6 +89,13 @@ function adSlot(pos){
       + "</div>"
       + (d.lead ? '<p class="lead">' + d.lead + "</p>" : "")
       + "</header>" + LEGEND;
+
+    if (d.commentary && d.commentary.length){
+      var s0 = '<div class="commentary">';
+      for (var c = 0; c < d.commentary.length; c++) s0 += "<p>" + d.commentary[c] + "</p>";
+      s0 += "</div>";
+      h += section("00", "오늘의 해설", s0);
+    }
 
     var s1 = table(d.market);
     if (d.stats && d.stats.length){
