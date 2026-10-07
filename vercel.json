@@ -1,0 +1,15 @@
+{
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "antbrief.vercel.app"
+        }
+      ],
+      "destination": "https://antbrief.kro.kr/$1",
+      "statusCode": 301
+    }
+  ]
+}
