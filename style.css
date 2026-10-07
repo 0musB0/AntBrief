@@ -119,6 +119,7 @@
     margin:0 0 6px;
   }
   .lead strong{color:var(--accent-ink);}
+  .commentary p{line-height:1.85;margin:0 0 14px;font-size:15px}
 
   .legend{
     margin-top:22px;
