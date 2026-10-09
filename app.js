@@ -13,6 +13,7 @@ function adSlot(pos){
 
   var app = document.getElementById("app");
 
+  function esc(x){ return String(x == null ? "" : x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
   function statebox(title, body){
     app.innerHTML = '<div class="statebox"><h2>' + title + '</h2>' + body + '</div>';
   }
@@ -143,8 +144,9 @@ function adSlot(pos){
       h += '<p class="sources-label">출처</p><p class="sources">';
       for (var s = 0; s < d.sources.length; s++){
         if (s) h += '<span class="sep">·</span>';
-        h += '<a href="' + d.sources[s][1] + '" target="_blank" rel="noopener noreferrer">'
-           + d.sources[s][0] + "</a>";
+        var lb = esc(d.sources[s][0]), u = d.sources[s][1];
+        h += u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + lb + "</a>"
+               : "<span>" + lb + "</span>";
       }
       h += "</p>";
     }
