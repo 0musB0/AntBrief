@@ -97,13 +97,30 @@ function adSlot(pos){
     return out ? '<div class="snapshot">' + out + "</div>" : "";
   }
 
-  function stocks(list){
+  var STOCKDIR = { up: ["🔺", "상승압력"], down: ["🔻", "하락압력"], neutral: ["➖", "중립"], vol: ["⚡", "양방향"] };
+  var DIRKEY = { "🔺": "up", "🔻": "down", "➖": "neutral", "⚡": "vol" };
+
+  // 종목별 뉴스 영향 방향. Gemini가 준 stockDir이 우선이고, 없으면 그 종목이 나온 첫 뉴스의 방향.
+  function stockDir(name, d){
+    if (d.stockDir && STOCKDIR[d.stockDir[name]]) return d.stockDir[name];
+    var rows = (d.news && d.news.rows) || [];
+    for (var i = 0; i < rows.length; i++){
+      var c = rows[i].c || [];
+      if (String(c[0]).indexOf(name) !== -1 || String(c[4]).indexOf(name) !== -1) return DIRKEY[String(c[2]).slice(0, 2)] || null;
+    }
+    return null;
+  }
+
+  function stocks(d){
+    var list = d.stocks;
     if (!list || !list.length) return "";
     var out = '<p class="stocks"><span>관련 종목</span>';
     for (var i = 0; i < list.length; i++){
-      out += '<a class="tag" href="/archive/?q=' + encodeURIComponent(list[i]) + '">' + esc(list[i]) + "</a>";
+      var k = stockDir(list[i], d), m = STOCKDIR[k];
+      out += '<a class="tag' + (m ? " tag-" + k : "") + '" href="/archive/?q=' + encodeURIComponent(list[i]) + '"'
+           + (m ? ' title="이번 회차 뉴스 기준 ' + m[1] + '"' : "") + ">" + (m ? m[0] + " " : "") + esc(list[i]) + "</a>";
     }
-    return out + "</p>";
+    return out + '<span class="stocks-note">방향은 이번 회차 뉴스의 영향이며 매매 의견이 아닙니다</span></p>';
   }
 
   function render(d){
@@ -130,7 +147,7 @@ function adSlot(pos){
       + (SLUG ? "" : '<div class="livetape"><p class="livetape-k">지금 시세 <span>미국 지수·원자재는 최대 15분 지연, 코스피·코스닥은 아래 브리핑 숫자 참고 · <a href="https://kr.tradingview.com/" rel="noopener nofollow" target="_blank">TradingView 제공</a></span></p><div id="liveTape"></div></div>'
         + '<p class="snap-note">브리핑 시점 기준</p>')
       + snapshot(d.market)
-      + stocks(d.stocks)
+      + stocks(d)
       + (SLUG ? "" : '<div id="favBox"></div>')
       + (d.lead ? '<p class="lead">' + d.lead + "</p>" : "")
       + "</header>" + LEGEND;
@@ -308,6 +325,29 @@ function adSlot(pos){
       cards[c].insertAdjacentHTML("beforeend",
         '<svg class="spark" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><polyline points="' + pts.join(" ") + '"/></svg>');
     }
+    flow(list, i, cards);
+  }
+
+  // 큰 흐름: 지금 값이 최근 20회차(약 1주) 평균보다 1% 넘게 높으면 상승, 낮으면 하락. 금리는 0.05%p.
+  function flow(list, i, cards){
+    var shown = 0;
+    for (var c = 0; c < cards.length; c++){
+      var k = cards[c].getAttribute("data-k"), sum = 0, n = 0;
+      var cur = num(list[i].m && list[i].m[k]);
+      for (var j = i; j < list.length && j < i + 20; j++){
+        var y = num(list[j].m && list[j].m[k]);
+        if (y !== null){ sum += y; n++; }
+      }
+      if (cur === null || n < 8) continue;
+      var avg = sum / n, rate = k.indexOf("10년물") !== -1;
+      var gap = rate ? cur - avg : (cur - avg) / avg * 100, cut = rate ? 0.05 : 1;
+      var f = gap > cut ? ["up", "▲ 상승 흐름"] : gap < -cut ? ["down", "▼ 하락 흐름"] : ["flat", "― 횡보"];
+      var d = cards[c].querySelector(".snap-d");
+      if (d) d.insertAdjacentHTML("afterend", '<span class="flow flow-' + f[0] + '">' + f[1] + "</span>");
+      shown++;
+    }
+    var grid = app.querySelector(".snapshot");
+    if (shown && grid) grid.insertAdjacentHTML("afterend", '<p class="flow-note">흐름은 최근 20회차(약 1주) 평균 대비이며, 앞으로의 방향이 아닙니다.</p>');
   }
 
   function favs(){ try { return JSON.parse(localStorage.getItem("favStocks")) || []; } catch (e) { return []; } }
