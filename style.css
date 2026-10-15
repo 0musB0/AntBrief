@@ -408,6 +408,7 @@
     text-align:center;
   }
   .ad-slot:empty{display:none;}
+  .ad-slot:has(ins[data-ad-status="unfilled"]){display:none;}
 
   .issuenav{
     display:flex;

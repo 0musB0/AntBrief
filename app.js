@@ -1,11 +1,10 @@
 var AD_CLIENT = "ca-pub-4554703495384988";
-var AD_SLOTS = { top: "", bottom: "" };
+var AD_SLOTS = { top: "4095078045", bottom: "6777081702" };
 
 function adSlot(pos){
   if (!AD_CLIENT || !AD_SLOTS[pos]) return "";
   return '<div class="ad-slot"><ins class="adsbygoogle" style="display:block" data-ad-client="'
-    + AD_CLIENT + '" data-ad-slot="' + AD_SLOTS[pos] + '" data-ad-format="auto" data-full-width-responsive="true"></ins>'
-    + '<script>(adsbygoogle = window.adsbygoogle || []).push({});<' + '/script></div>';
+    + AD_CLIENT + '" data-ad-slot="' + AD_SLOTS[pos] + '" data-ad-format="auto" data-full-width-responsive="true"></ins></div>';
 }
 
 (function(){
@@ -232,6 +231,9 @@ function adSlot(pos){
     h += "</footer></div>";
 
     app.innerHTML = h;
+    // innerHTML로 넣은 <script>는 실행되지 않으므로 광고 칸마다 직접 push
+    var ads = app.querySelectorAll("ins.adsbygoogle");
+    for (var a = 0; a < ads.length; a++){ try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch(e){} }
     if (!SLUG){ liveTape(); regime(); }
     startClock();
     glossary();
