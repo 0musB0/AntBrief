@@ -325,6 +325,29 @@ function adSlot(pos){
       cards[c].insertAdjacentHTML("beforeend",
         '<svg class="spark" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><polyline points="' + pts.join(" ") + '"/></svg>');
     }
+    flow(list, i, cards);
+  }
+
+  // 큰 흐름: 지금 값이 최근 20회차(약 1주) 평균보다 1% 넘게 높으면 상승, 낮으면 하락. 금리는 0.05%p.
+  function flow(list, i, cards){
+    var shown = 0;
+    for (var c = 0; c < cards.length; c++){
+      var k = cards[c].getAttribute("data-k"), sum = 0, n = 0;
+      var cur = num(list[i].m && list[i].m[k]);
+      for (var j = i; j < list.length && j < i + 20; j++){
+        var y = num(list[j].m && list[j].m[k]);
+        if (y !== null){ sum += y; n++; }
+      }
+      if (cur === null || n < 8) continue;
+      var avg = sum / n, rate = k.indexOf("10년물") !== -1;
+      var gap = rate ? cur - avg : (cur - avg) / avg * 100, cut = rate ? 0.05 : 1;
+      var f = gap > cut ? ["up", "▲ 상승 흐름"] : gap < -cut ? ["down", "▼ 하락 흐름"] : ["flat", "― 횡보"];
+      var d = cards[c].querySelector(".snap-d");
+      if (d) d.insertAdjacentHTML("afterend", '<span class="flow flow-' + f[0] + '">' + f[1] + "</span>");
+      shown++;
+    }
+    var grid = app.querySelector(".snapshot");
+    if (shown && grid) grid.insertAdjacentHTML("afterend", '<p class="flow-note">흐름은 최근 20회차(약 1주) 평균 대비이며, 앞으로의 방향이 아닙니다.</p>');
   }
 
   function favs(){ try { return JSON.parse(localStorage.getItem("favStocks")) || []; } catch (e) { return []; } }

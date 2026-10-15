@@ -181,6 +181,10 @@
 
   .stocks{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 16px;font-size:12px;color:var(--ink-faint);}
   .tag{display:inline-flex;align-items:center;min-height:30px;padding:0 10px;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--ink-dim);font-size:13px;text-decoration:none;}
+  .flow{align-self:flex-start;margin-top:4px;padding:0 7px;border-radius:999px;font-size:11px;line-height:18px;background:var(--surface-2);color:var(--ink-dim);}
+  .flow-up{color:var(--up);background:var(--up-bg);}
+  .flow-down{color:var(--down);background:var(--down-bg);}
+  .flow-note{margin:-10px 0 16px;font-size:11px;color:var(--ink-faint);}
   .tag-up{color:var(--up);border-color:var(--up-bg);background:var(--up-bg);}
   .tag-down{color:var(--down);border-color:var(--down-bg);background:var(--down-bg);}
   .tag-vol{color:var(--volatile);border-color:var(--volatile-bg);background:var(--volatile-bg);}
