@@ -11,10 +11,10 @@
     --accent:#d3ac3f;
     --accent-ink:#f3e3b0;
     --accent-bg:#332a12;
-    --up:#5fbb92;
-    --up-bg:#153025;
-    --down:#e28777;
-    --down-bg:#33201b;
+    --up:#ef7a6d;
+    --up-bg:#35201c;
+    --down:#6fa8ef;
+    --down-bg:#18263a;
     --neutral-dir:#9aa2b0;
     --neutral-bg:#23262d;
     --volatile:#d9a94a;
@@ -108,10 +108,49 @@
     color:var(--accent-ink);
   }
   .um-item .val.sched{color:var(--ink-dim);}
-  .um-item .val.done{color:var(--up);}
+  .um-item .val.done{color:var(--ink);}
   @media (max-width:420px){
     .um-item{white-space:normal;}
   }
+  .um-link{margin-left:auto;color:var(--accent-ink);text-decoration:none;font-weight:600;}
+  .um-link:hover{text-decoration:underline;}
+  .stale{
+    margin:-6px 0 16px;
+    padding:9px 12px;
+    font-size:13px;
+    color:var(--volatile);
+    background:var(--volatile-bg);
+    border-radius:6px;
+  }
+
+  .snapshot{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:8px;
+    margin:0 0 18px;
+  }
+  .snap{
+    display:flex;
+    flex-direction:column;
+    gap:1px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-top:3px solid var(--border-strong);
+    border-radius:6px;
+    padding:9px 12px;
+  }
+  .snap.row-up{border-top-color:var(--up);}
+  .snap.row-down{border-top-color:var(--down);}
+  .snap.row-volatile{border-top-color:var(--volatile);}
+  .snap-k{font-size:12px;color:var(--ink-faint);}
+  .snap-v{font-family:ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Consolas, monospace;font-variant-numeric:tabular-nums;font-size:17px;font-weight:700;}
+  .snap-d{font-family:ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Consolas, monospace;font-variant-numeric:tabular-nums;font-size:12px;color:var(--ink-dim);}
+  .snap.row-up .snap-d{color:var(--up);}
+  .snap.row-down .snap-d{color:var(--down);}
+  @media (max-width:420px){
+    .snapshot{grid-template-columns:1fr 1fr;}
+  }
+
   .lead{
     font-size:16.5px;
     line-height:1.68;
@@ -329,6 +368,33 @@
     text-align:center;
   }
   .ad-slot:empty{display:none;}
+
+  .issuenav{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:10px 14px;
+    margin-top:36px;
+    padding:14px 0;
+    border-top:1px solid var(--border);
+    border-bottom:1px solid var(--border);
+    font-size:14px;
+  }
+  .sharebtn{
+    font:inherit;
+    font-weight:600;
+    color:var(--accent-ink);
+    background:var(--accent-bg);
+    border:1px solid var(--accent);
+    border-radius:6px;
+    padding:7px 14px;
+    min-height:40px;
+    cursor:pointer;
+  }
+  .in-links{display:flex;flex-wrap:wrap;gap:6px 16px;margin-left:auto;}
+  .in-links a{color:var(--ink-dim);text-decoration:none;display:inline-flex;align-items:center;min-height:40px;}
+  .in-links a:hover{color:var(--ink);}
+  .in-links a span{font-family:ui-monospace, "SF Mono", Consolas, monospace;font-size:12px;color:var(--ink-faint);margin-left:4px;}
 
   footer{
     margin-top:44px;
