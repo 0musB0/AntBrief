@@ -97,13 +97,30 @@ function adSlot(pos){
     return out ? '<div class="snapshot">' + out + "</div>" : "";
   }
 
-  function stocks(list){
+  var STOCKDIR = { up: ["🔺", "상승압력"], down: ["🔻", "하락압력"], neutral: ["➖", "중립"], vol: ["⚡", "양방향"] };
+  var DIRKEY = { "🔺": "up", "🔻": "down", "➖": "neutral", "⚡": "vol" };
+
+  // 종목별 뉴스 영향 방향. Gemini가 준 stockDir이 우선이고, 없으면 그 종목이 나온 첫 뉴스의 방향.
+  function stockDir(name, d){
+    if (d.stockDir && STOCKDIR[d.stockDir[name]]) return d.stockDir[name];
+    var rows = (d.news && d.news.rows) || [];
+    for (var i = 0; i < rows.length; i++){
+      var c = rows[i].c || [];
+      if (String(c[0]).indexOf(name) !== -1 || String(c[4]).indexOf(name) !== -1) return DIRKEY[String(c[2]).slice(0, 2)] || null;
+    }
+    return null;
+  }
+
+  function stocks(d){
+    var list = d.stocks;
     if (!list || !list.length) return "";
     var out = '<p class="stocks"><span>관련 종목</span>';
     for (var i = 0; i < list.length; i++){
-      out += '<a class="tag" href="/archive/?q=' + encodeURIComponent(list[i]) + '">' + esc(list[i]) + "</a>";
+      var k = stockDir(list[i], d), m = STOCKDIR[k];
+      out += '<a class="tag' + (m ? " tag-" + k : "") + '" href="/archive/?q=' + encodeURIComponent(list[i]) + '"'
+           + (m ? ' title="이번 회차 뉴스 기준 ' + m[1] + '"' : "") + ">" + (m ? m[0] + " " : "") + esc(list[i]) + "</a>";
     }
-    return out + "</p>";
+    return out + '<span class="stocks-note">방향은 이번 회차 뉴스의 영향이며 매매 의견이 아닙니다</span></p>';
   }
 
   function render(d){
@@ -128,7 +145,7 @@ function adSlot(pos){
       + '<div class="timestamp">' + (d.stamp || "") + "</div>"
       + meta
       + snapshot(d.market)
-      + stocks(d.stocks)
+      + stocks(d)
       + (SLUG ? "" : '<div id="favBox"></div>')
       + (d.lead ? '<p class="lead">' + d.lead + "</p>" : "")
       + "</header>" + LEGEND;
