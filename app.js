@@ -88,13 +88,22 @@ function adSlot(pos){
   function snapshot(m){
     if (!m || !m.rows) return "";
     var out = "";
-    for (var i = 0; i < m.rows.length && i < 4; i++){
+    for (var i = 0; i < m.rows.length; i++){
       var c = m.rows[i].c || [];
-      if (!c[1]) continue;
+      if (!c[1] || c[1] === "확인 불가") continue;
       out += '<div class="snap ' + (ROWCLS[m.rows[i].d] || "") + '"><span class="snap-k">' + c[0]
            + '</span><span class="snap-v">' + c[1] + '</span><span class="snap-d">' + (c[2] || "") + "</span></div>";
     }
     return out ? '<div class="snapshot">' + out + "</div>" : "";
+  }
+
+  function stocks(list){
+    if (!list || !list.length) return "";
+    var out = '<p class="stocks"><span>관련 종목</span>';
+    for (var i = 0; i < list.length; i++){
+      out += '<a class="tag" href="/archive/?q=' + encodeURIComponent(list[i]) + '">' + esc(list[i]) + "</a>";
+    }
+    return out + "</p>";
   }
 
   function render(d){
@@ -116,6 +125,7 @@ function adSlot(pos){
       + '<div class="timestamp">' + (d.stamp || "") + (d.sub ? " · " + d.sub : "") + "</div>"
       + meta
       + snapshot(d.market)
+      + stocks(d.stocks)
       + (d.lead ? '<p class="lead">' + d.lead + "</p>" : "")
       + "</header>" + LEGEND;
 
