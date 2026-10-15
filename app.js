@@ -119,10 +119,13 @@ function adSlot(pos){
         + "</div>"
         + (age > 10 ? '<p class="stale">갱신이 늦어지고 있습니다. 아래 내용은 약 ' + Math.floor(age) + "시간 전 기준입니다.</p>" : "");
 
+    // 검색 제목(Code.gs headline_)에서 사이트 이름을 뗀 것. 예전 형식 페이지는 sub로 대신함.
+    var tparts = document.title.split(" | ");
+    var headline = tparts.length > 1 ? tparts[0] : (d.sub || "섬개미 증시 브리핑");
     var h = '<div class="wrap"><header class="masthead">'
       + '<span class="kicker">Market Briefing · KOSPI / KOSDAQ</span>'
-      + '<h1 class="title">섬개미 증시 브리핑</h1>'
-      + '<div class="timestamp">' + (d.stamp || "") + (d.sub ? " · " + d.sub : "") + "</div>"
+      + '<h1 class="title">' + headline + "</h1>"
+      + '<div class="timestamp">' + (d.stamp || "") + "</div>"
       + meta
       + snapshot(d.market)
       + stocks(d.stocks)
