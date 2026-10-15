@@ -91,7 +91,7 @@ function adSlot(pos){
     for (var i = 0; i < m.rows.length; i++){
       var c = m.rows[i].c || [];
       if (!c[1] || c[1] === "확인 불가") continue;
-      out += '<div class="snap ' + (ROWCLS[m.rows[i].d] || "") + '"><span class="snap-k">' + c[0]
+      out += '<div class="snap ' + (ROWCLS[m.rows[i].d] || "") + '" data-k="' + esc(c[0]) + '"><span class="snap-k">' + c[0]
            + '</span><span class="snap-v">' + c[1] + '</span><span class="snap-d">' + (c[2] || "") + "</span></div>";
     }
     return out ? '<div class="snapshot">' + out + "</div>" : "";
@@ -129,6 +129,7 @@ function adSlot(pos){
       + meta
       + snapshot(d.market)
       + stocks(d.stocks)
+      + (SLUG ? "" : '<div id="favBox"></div>')
       + (d.lead ? '<p class="lead">' + d.lead + "</p>" : "")
       + "</header>" + LEGEND;
 
@@ -160,10 +161,16 @@ function adSlot(pos){
     }
     h += section("02", "뉴스별 중요도 · 방향", s2);
 
-    var s3 = table(d.cal) + (d.calNote ? '<p class="note-line">' + d.calNote + "</p>" : "");
+    var s3 = table(d.cal) + (d.calNote ? '<p class="note-line">' + d.calNote + "</p>" : "")
+      + (SLUG ? "" : '<p class="note-line"><a href="/calendar.html">이번 주 일정 한눈에 보기 · 구글 캘린더에 추가 →</a></p>');
     h += section("03", "향후 7일 일정", s3);
 
     var s4 = "";
+    var rv = d.review;
+    if (rv && rv.text){
+      s4 += '<div class="review"><p class="review-label">직전 회차 복기' + (rv.prev ? " · " + esc(rv.prev) : "")
+         + (rv.pick ? ' <span class="review-pick">' + esc(rv.pick) + "</span>" : "") + "</p><p>" + esc(rv.text) + "</p></div>";
+    }
     if (d.scen){
       for (var k = 0; k < d.scen.length; k++){
         var sc = d.scen[k];
@@ -197,6 +204,7 @@ function adSlot(pos){
 
     app.innerHTML = h;
     startClock();
+    glossary();
   }
 
   var clockTimer = null;
@@ -250,10 +258,96 @@ function adSlot(pos){
       el.innerHTML = (list[i + 1] ? link(list[i + 1], "← 이전", list) : "")
         + '<a href="/archive/">전체 목록</a>'
         + (i > 0 ? link(list[i - 1], "다음 →", list) : "");
+      trend(list, i);
+      if (!SLUG) favBox(list);
     }).catch(function(){});
   }
 
+  function num(v){ var n = parseFloat(String(v == null ? "" : v).replace(/,/g, "")); return isFinite(n) ? n : null; }
+
+  // 카드마다 최근 10회차 추이선과 직전 회차 대비. 값은 list.json의 m(회차별 현재값).
+  function trend(list, i){
+    var cards = app.querySelectorAll(".snap[data-k]");
+    for (var c = 0; c < cards.length; c++){
+      var k = cards[c].getAttribute("data-k"), ys = [];
+      for (var j = Math.min(list.length - 1, i + 9); j >= i; j--){
+        var y = num(list[j].m && list[j].m[k]);
+        if (y !== null) ys.push(y);
+      }
+      if (ys.length < 2) continue;
+      var lo = Math.min.apply(null, ys), hi = Math.max.apply(null, ys), span = hi - lo || 1, pts = [];
+      for (var p = 0; p < ys.length; p++) pts.push((p * 100 / (ys.length - 1)).toFixed(1) + "," + (22 - (ys[p] - lo) * 20 / span).toFixed(1));
+      var cur = ys[ys.length - 1], prev = ys[ys.length - 2], pct = prev ? (cur - prev) / prev * 100 : 0;
+      cards[c].insertAdjacentHTML("beforeend",
+        '<svg class="spark" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><polyline points="' + pts.join(" ") + '"/></svg>'
+        + '<span class="snap-p">' + (Math.abs(pct) < 0.005 ? "직전 회차와 같음" : "직전 회차 대비 " + (pct > 0 ? "+" : "") + pct.toFixed(2) + "%") + "</span>");
+    }
+  }
+
+  function favs(){ try { return JSON.parse(localStorage.getItem("favStocks")) || []; } catch (e) { return []; } }
+
+  // 관심 종목(지난 브리핑 목록에서 고정)이 나온 최근 브리핑 3개씩.
+  function favBox(list){
+    var el = document.getElementById("favBox"), f = favs(), out = "";
+    if (!el || !f.length) return;
+    for (var a = 0; a < f.length; a++){
+      var hits = [];
+      for (var j = 0; j < list.length && hits.length < 3; j++){
+        if ((list[j].stocks || []).indexOf(f[a]) !== -1 || String(list[j].sub).indexOf(f[a]) !== -1) hits.push('<a href="' + (j ? "/archive/" + encodeURIComponent(list[j].slug) + ".html" : "/") + '">'
+          + esc(String(list[j].short).replace(" KST", "")) + " <span>" + esc(String(list[j].sub).slice(0, 28)) + "</span></a>");
+      }
+      out += '<div class="fav-row"><a class="tag" href="/archive/?q=' + encodeURIComponent(f[a]) + '">★ ' + esc(f[a]) + "</a>"
+           + (hits.length ? hits.join("") : '<span class="fav-none">최근 언급 없음</span>') + "</div>";
+    }
+    el.innerHTML = '<div class="favbox"><p class="favbox-title">관심 종목</p>' + out + "</div>";
+  }
+
+  // 본문 용어에 풀이를 단다. 풀이는 /glossary.html의 dl.glossary 하나에만 적는다.
+  function glossary(){
+    if (!window.fetch || !window.DOMParser) return;
+    fetch("/glossary.html").then(function(r){ return r.text(); }).then(function(html){
+      var doc = new DOMParser().parseFromString(html, "text/html");
+      var dts = doc.querySelectorAll("dl.glossary dt[id]"), terms = [];
+      for (var t = 0; t < dts.length; t++){
+        var dd = dts[t].nextElementSibling;
+        if (dd) terms.push({ w: dts[t].textContent.trim(), id: dts[t].id, d: dd.textContent.trim() });
+      }
+      terms.sort(function(a, b){ return b.w.length - a.w.length; });
+      var roots = app.querySelectorAll(".lead, .commentary, .correction, .verdict, .statstrip, .scenario .intro, .scenario .watch");
+      for (var x = 0; x < terms.length; x++){
+        for (var r = 0; r < roots.length; r++){ if (mark(roots[r], terms[x])) break; }
+      }
+    }).catch(function(){});
+  }
+
+  function mark(root, term){
+    var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false), n;
+    while ((n = w.nextNode())){
+      if (n.parentNode.closest(".term, .term-pop")) continue;
+      var at = n.nodeValue.indexOf(term.w);
+      if (at === -1) continue;
+      var rest = n.splitText(at);
+      rest.splitText(term.w.length);
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "term"; b.textContent = term.w;
+      b.setAttribute("aria-expanded", "false");
+      b.setAttribute("data-d", term.d); b.setAttribute("data-id", term.id);
+      rest.parentNode.replaceChild(b, rest);
+      return true;
+    }
+    return false;
+  }
+
   app.addEventListener("click", function(e){
+    var t = e.target.closest && e.target.closest(".term");
+    if (t){
+      var open = t.nextSibling && t.nextSibling.className === "term-pop";
+      if (open) t.parentNode.removeChild(t.nextSibling);
+      else t.insertAdjacentHTML("afterend", '<span class="term-pop">' + esc(t.getAttribute("data-d"))
+        + ' <a href="/glossary.html#' + esc(t.getAttribute("data-id")) + '">용어 풀이 전체</a></span>');
+      t.setAttribute("aria-expanded", open ? "false" : "true");
+      return;
+    }
     var b = e.target.closest && e.target.closest("#shareBtn");
     if (!b) return;
     var url = permalink || location.href.split("#")[0];
