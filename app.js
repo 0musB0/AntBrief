@@ -30,11 +30,11 @@ function adSlot(pos){
     return "";
   }
 
-  function table(spec, narrow){
+  function table(spec, cls){
     if (!spec || !spec.rows || !spec.rows.length) return "";
     var head = spec.head || [];
     var colcls = spec.colcls || [];
-    var out = '<div class="twrap"><table' + (narrow ? ' class="narrow"' : '') + '><thead><tr>';
+    var out = '<div class="twrap"><table' + (cls ? ' class="' + cls + '"' : '') + '><thead><tr>';
     for (var i = 0; i < head.length; i++) out += "<th>" + head[i] + "</th>";
     out += "</tr></thead><tbody>";
 
@@ -140,7 +140,7 @@ function adSlot(pos){
       h += section("00", "오늘의 해설", s0);
     }
 
-    var s1 = table(d.market);
+    var s1 = table(d.market, "mkt");
     if (d.stats && d.stats.length){
       s1 += '<div class="statstrip">';
       for (var i = 0; i < d.stats.length; i++){
@@ -177,7 +177,7 @@ function adSlot(pos){
         s4 += '<div class="scenario"><div class="scenario-head"><h3>' + sc.t + "</h3>"
            + '<span class="stars">중요도 ' + (sc.stars || "") + "</span></div>"
            + (sc.intro ? '<p class="intro">' + sc.intro + "</p>" : "")
-           + table({ head: sc.head, colcls: sc.colcls, rows: sc.rows }, true)
+           + table({ head: sc.head, colcls: sc.colcls, rows: sc.rows }, "narrow")
            + (sc.watch ? '<p class="watch"><b>볼 것</b> ' + sc.watch + "</p>" : "")
            + "</div>";
       }
@@ -272,15 +272,13 @@ function adSlot(pos){
       var k = cards[c].getAttribute("data-k"), ys = [];
       for (var j = Math.min(list.length - 1, i + 9); j >= i; j--){
         var y = num(list[j].m && list[j].m[k]);
-        if (y !== null) ys.push(y);
+        if (y !== null && y !== ys[ys.length - 1]) ys.push(y); // 장 마감 뒤 회차는 같은 값이라 한 점으로
       }
       if (ys.length < 2) continue;
       var lo = Math.min.apply(null, ys), hi = Math.max.apply(null, ys), span = hi - lo || 1, pts = [];
       for (var p = 0; p < ys.length; p++) pts.push((p * 100 / (ys.length - 1)).toFixed(1) + "," + (22 - (ys[p] - lo) * 20 / span).toFixed(1));
-      var cur = ys[ys.length - 1], prev = ys[ys.length - 2], pct = prev ? (cur - prev) / prev * 100 : 0;
       cards[c].insertAdjacentHTML("beforeend",
-        '<svg class="spark" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><polyline points="' + pts.join(" ") + '"/></svg>'
-        + '<span class="snap-p">' + (Math.abs(pct) < 0.005 ? "직전 회차와 같음" : "직전 회차 대비 " + (pct > 0 ? "+" : "") + pct.toFixed(2) + "%") + "</span>");
+        '<svg class="spark" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><polyline points="' + pts.join(" ") + '"/></svg>');
     }
   }
 
@@ -344,7 +342,7 @@ function adSlot(pos){
       var open = t.nextSibling && t.nextSibling.className === "term-pop";
       if (open) t.parentNode.removeChild(t.nextSibling);
       else t.insertAdjacentHTML("afterend", '<span class="term-pop">' + esc(t.getAttribute("data-d"))
-        + ' <a href="/glossary.html#' + esc(t.getAttribute("data-id")) + '">용어 풀이 전체</a></span>');
+        + ' <a href="/glossary/' + esc(t.getAttribute("data-id")) + '.html">자세히</a></span>');
       t.setAttribute("aria-expanded", open ? "false" : "true");
       return;
     }
