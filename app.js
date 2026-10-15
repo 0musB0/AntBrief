@@ -127,6 +127,8 @@ function adSlot(pos){
       + '<h1 class="title">' + headline + "</h1>"
       + '<div class="timestamp">' + (d.stamp || "") + "</div>"
       + meta
+      + (SLUG ? "" : '<div class="livetape"><p class="livetape-k">지금 시세 <span>미국 지수·원자재는 최대 15분 지연, 코스피·코스닥은 아래 브리핑 숫자 참고 · <a href="https://kr.tradingview.com/" rel="noopener nofollow" target="_blank">TradingView 제공</a></span></p><div id="liveTape"></div></div>'
+        + '<p class="snap-note">브리핑 시점 기준</p>')
       + snapshot(d.market)
       + stocks(d.stocks)
       + (SLUG ? "" : '<div id="favBox"></div>')
@@ -203,8 +205,35 @@ function adSlot(pos){
     h += "</footer></div>";
 
     app.innerHTML = h;
+    if (!SLUG) liveTape();
     startClock();
     glossary();
+  }
+
+  // TradingView 공식 티커 위젯. KRX 지수는 위젯에서 막혀 있어(잘못된 심볼) 미국·환율·원자재만 넣음.
+  // innerHTML로 넣은 script는 실행되지 않으므로 직접 만들어 붙임.
+  function liveTape(){
+    var el = document.getElementById("liveTape");
+    if (!el) return;
+    var s = document.createElement("script");
+    s.src = "https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js";
+    s.async = true;
+    s.text = JSON.stringify({
+      symbols: [
+        { proName: "FOREXCOM:SPXUSD", title: "S&P 500" },
+        { proName: "FOREXCOM:NSXUSD", title: "나스닥 100" },
+        { proName: "FOREXCOM:DJI", title: "다우" },
+        { proName: "FX_IDC:USDKRW", title: "달러/원" },
+        { proName: "TVC:UKOIL", title: "브렌트유" },
+        { proName: "TVC:USOIL", title: "WTI" },
+        { proName: "TVC:GOLD", title: "금" },
+        { proName: "TVC:US10Y", title: "미 10년물" }
+      ],
+      showSymbolLogo: false, isTransparent: true, displayMode: "adaptive", colorTheme: "dark", locale: "kr"
+    });
+    el.className = "tradingview-widget-container";
+    el.innerHTML = '<div class="tradingview-widget-container__widget"></div>';
+    el.appendChild(s);
   }
 
   var clockTimer = null;
