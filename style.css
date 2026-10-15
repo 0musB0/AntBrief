@@ -123,6 +123,13 @@
     border-radius:6px;
   }
 
+  .livetape{margin:0 0 14px;border:1px solid var(--border);border-radius:8px;padding:6px 8px 2px;min-height:62px;}
+  .livetape-k{margin:0 0 2px;font-size:12px;font-weight:700;color:var(--ink-dim);}
+  .livetape-k span{font-weight:400;color:var(--ink-faint);margin-left:6px;}
+  /* 사이트가 color-scheme:dark라서, 밝은 문서인 위젯 iframe이 흰 바탕으로 칠해짐. iframe 쪽을 맞춰 투명하게 둠. */
+  .livetape iframe{color-scheme:light;background:transparent;}
+  .snap-note{margin:0 0 6px;font-size:12px;color:var(--ink-faint);}
+
   .snapshot{
     display:grid;
     grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
