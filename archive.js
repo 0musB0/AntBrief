@@ -16,4 +16,6 @@
     count.textContent = words.length ? shown + "건" : "";
   }
   q.addEventListener("input", run);
+  var pre = new URLSearchParams(location.search).get("q");
+  if (pre){ q.value = pre; run(); }
 })();
