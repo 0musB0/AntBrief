@@ -226,8 +226,7 @@ function adSlot(pos){
         { proName: "FX_IDC:USDKRW", title: "달러/원" },
         { proName: "TVC:UKOIL", title: "브렌트유" },
         { proName: "TVC:USOIL", title: "WTI" },
-        { proName: "TVC:GOLD", title: "금" },
-        { proName: "TVC:US10Y", title: "미 10년물" }
+        { proName: "TVC:GOLD", title: "금" }
       ],
       showSymbolLogo: false, isTransparent: true, displayMode: "adaptive", colorTheme: "dark", locale: "kr"
     });
