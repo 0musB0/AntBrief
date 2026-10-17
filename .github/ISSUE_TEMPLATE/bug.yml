@@ -1,0 +1,33 @@
+name: 버그 신고
+description: 화면이 깨지거나, 숫자·글이 틀리거나, 브리핑이 안 올라왔을 때
+labels: [bug]
+body:
+  - type: input
+    id: url
+    attributes:
+      label: 페이지 주소
+      description: 문제가 보인 주소. 지난 브리핑이면 archive/ 주소
+      placeholder: https://antbrief.vercel.app/archive/20261017-1400.html
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 무엇이 잘못됐나요
+      description: 보인 그대로 적어 주세요. 스크린샷을 붙이면 가장 빠릅니다.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 원래 어떻게 보여야 하나요
+  - type: dropdown
+    id: device
+    attributes:
+      label: 기기
+      options: [휴대폰, PC, 태블릿, 모름]
+  - type: input
+    id: source
+    attributes:
+      label: 제보 경로
+      description: 독자 메일로 받았다면 받은 날짜와 함께 적어 주세요 (개인정보 제외)

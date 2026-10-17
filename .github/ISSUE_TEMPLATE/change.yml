@@ -1,0 +1,19 @@
+name: 수정·기능 요청
+description: 문구, 디자인, 새 기능 등 바꾸고 싶은 것
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: 무엇을 바꾸고 싶나요
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: 왜 필요한가요
+      description: 누가, 어떤 상황에서 불편한지
+  - type: input
+    id: url
+    attributes:
+      label: 관련 페이지 주소
