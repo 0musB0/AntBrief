@@ -149,6 +149,7 @@ function adSlot(pos){
       + snapshot(d.market)
       + stocks(d)
       + (SLUG ? "" : '<div id="favBox"></div>')
+      + (SLUG ? "" : '<div id="regime"></div>')
       + (d.lead ? '<p class="lead">' + d.lead + "</p>" : "")
       + "</header>" + LEGEND;
 
@@ -222,7 +223,7 @@ function adSlot(pos){
     h += "</footer></div>";
 
     app.innerHTML = h;
-    if (!SLUG) liveTape();
+    if (!SLUG){ liveTape(); regime(); }
     startClock();
     glossary();
   }
@@ -348,6 +349,42 @@ function adSlot(pos){
     }
     var grid = app.querySelector(".snapshot");
     if (shown && grid) grid.insertAdjacentHTML("afterend", '<p class="flow-note">흐름은 최근 20회차(약 1주) 평균 대비이며, 앞으로의 방향이 아닙니다.</p>');
+  }
+
+  // 큰 흐름(상승장·하락장): Code.gs regimeFiles_가 지수 일봉으로 판정해 올린 regime.json. 파일이 없으면 아무것도 안 그림.
+  function regime(){
+    if (!window.fetch) return;
+    fetch("/regime.json", { cache: "no-cache" }).then(function(r){ return r.ok ? r.json() : null; }).then(function(j){
+      var el = document.getElementById("regime");
+      if (!el || !j || !j.idx || !j.idx.length) return;
+      var out = "";
+      for (var a = 0; a < j.idx.length; a++){
+        var g = j.idx[a], bull = g.state === "bull", b = g.bands || [];
+        if (!g.state || !b.length) continue;
+        var on = 0;
+        for (var s = 0; s < g.signs.length; s++) if (g.signs[s].on) on++;
+        var t0 = Date.parse(b[0][0]), t1 = Date.parse(g.asof), span = t1 - t0 || 1, bar = "", yrs = "";
+        for (var k = 0; k < b.length; k++){
+          var w = ((k + 1 < b.length ? Date.parse(b[k + 1][0]) : t1) - Date.parse(b[k][0])) / span * 100;
+          bar += '<span class="rg-' + b[k][1] + '" style="width:' + w.toFixed(2) + '%" title="' + b[k][0] + "부터 " + (b[k][1] === "bull" ? "상승장" : "하락장") + '"></span>';
+        }
+        for (var y = new Date(t0).getFullYear() + 1; Date.parse(y + "-01-01") < t1; y++)
+          yrs += '<span style="left:' + ((Date.parse(y + "-01-01") - t0) / span * 100).toFixed(2) + '%">' + y + "</span>";
+        var signs = "";
+        for (var s2 = 0; s2 < g.signs.length; s2++)
+          signs += '<li class="' + (g.signs[s2].on ? "on" : "") + '">' + esc(g.signs[s2].t) + "</li>";
+        out += '<div class="rg-card"><p class="rg-head"><b>' + esc(g.name) + '</b><span class="rg-state rg-' + g.state + '">' + (bull ? "상승장" : "하락장") + "</span>"
+          + '<span class="rg-since">' + esc(g.since) + (bull ? " 저점부터" : " 고점부터") + (g.cut ? " · 기준 " + g.cut + "%" : "") + "</span></p>"
+          + '<p class="rg-turn' + (g.turn ? " rg-turn-" + g.turn : "") + '">'
+          + (g.turn ? (g.turn === "up" ? "상승 전환 조짐" : "하락 전환 조짐") : "전환 조짐 약함") + " · " + (bull ? "하락" : "상승") + " 쪽 신호 " + on + "/" + g.signs.length + "</p>"
+          + '<ul class="rg-signs">' + signs + "</ul>"
+          + '<div class="rg-bar" aria-hidden="true">' + bar + '</div><div class="rg-years" aria-hidden="true">' + yrs + "</div></div>";
+      }
+      if (!out) return;
+      el.innerHTML = '<div class="regime"><p class="rg-title">큰 흐름 · 상승장과 하락장</p><div class="rg-grid">' + out + "</div>"
+        + '<p class="rg-note">고점에서 기준(한국 15%, 미국 20%)보다 많이 내리면 하락장, 저점에서 그만큼 오르면 상승장으로 나눕니다(지수 종가, ' + esc(j.idx[0].asof) + " 기준). "
+        + "전환 조짐은 200일선·50일선 위치와 고점·저점에서 10% 넘게 움직였는지 3가지 중 2가지 이상이 반대쪽을 가리킬 때입니다. 지난 흐름을 정리한 것이며 앞으로의 방향을 예측하거나 매매를 권하는 것이 아닙니다.</p></div>";
+    }).catch(function(){});
   }
 
   function favs(){ try { return JSON.parse(localStorage.getItem("favStocks")) || []; } catch (e) { return []; } }
