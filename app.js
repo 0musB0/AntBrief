@@ -374,7 +374,7 @@ function adSlot(pos){
         for (var s2 = 0; s2 < g.signs.length; s2++)
           signs += '<li class="' + (g.signs[s2].on ? "on" : "") + '">' + esc(g.signs[s2].t) + "</li>";
         out += '<div class="rg-card"><p class="rg-head"><b>' + esc(g.name) + '</b><span class="rg-state rg-' + g.state + '">' + (bull ? "상승장" : "하락장") + "</span>"
-          + '<span class="rg-since">' + esc(g.since) + (bull ? " 저점부터" : " 고점부터") + "</span></p>"
+          + '<span class="rg-since">' + esc(g.since) + (bull ? " 저점부터" : " 고점부터") + (g.cut ? " · 기준 " + g.cut + "%" : "") + "</span></p>"
           + '<p class="rg-turn' + (g.turn ? " rg-turn-" + g.turn : "") + '">'
           + (g.turn ? (g.turn === "up" ? "상승 전환 조짐" : "하락 전환 조짐") : "전환 조짐 약함") + " · " + (bull ? "하락" : "상승") + " 쪽 신호 " + on + "/" + g.signs.length + "</p>"
           + '<ul class="rg-signs">' + signs + "</ul>"
@@ -382,7 +382,7 @@ function adSlot(pos){
       }
       if (!out) return;
       el.innerHTML = '<div class="regime"><p class="rg-title">큰 흐름 · 상승장과 하락장</p><div class="rg-grid">' + out + "</div>"
-        + '<p class="rg-note">고점에서 20% 넘게 내리면 하락장, 저점에서 20% 넘게 오르면 상승장으로 나눕니다(지수 종가, ' + esc(j.idx[0].asof) + " 기준). "
+        + '<p class="rg-note">고점에서 기준(한국 15%, 미국 20%)보다 많이 내리면 하락장, 저점에서 그만큼 오르면 상승장으로 나눕니다(지수 종가, ' + esc(j.idx[0].asof) + " 기준). "
         + "전환 조짐은 200일선·50일선 위치와 고점·저점에서 10% 넘게 움직였는지 3가지 중 2가지 이상이 반대쪽을 가리킬 때입니다. 지난 흐름을 정리한 것이며 앞으로의 방향을 예측하거나 매매를 권하는 것이 아닙니다.</p></div>";
     }).catch(function(){});
   }
