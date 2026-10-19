@@ -132,7 +132,7 @@ function publish() {
       ].concat(termFiles_(list), regimeFiles_()), 'briefing ' + data.short + (job.kind === 'gemini' ? ' (gemini)' : ''));
       props.setProperty('LAST_SLOT', slot);
       if (job.kind === 'gemini') { f.setName('[배포완료] ' + f.getName()); a.spark_id = null; }
-      cleanup_(a.spark_id); // gemini 경로면 방금 배포한 Briefing 파일 자신이 휴지통으로 감
+      cleanup_(a.spark_id); // gemini 경로면 방금 [배포완료] 붙인 Briefing 파일도 여기서 휴지통으로 감
     } catch (e) {
       f.setName('[오류] ' + f.getName());
       MailApp.sendEmail(Session.getEffectiveUser().getEmail(), '[섬개미] 브리핑 배포 실패',
@@ -182,11 +182,12 @@ function cleanup_(sparkId) {
       if (/^\[(배포완료|건너뜀)\]/.test(x.getName()) && x.getDateCreated().getTime() < cut) x.setTrashed(true);
     }
   } catch (e) { Logger.log('분석 파일 정리 실패: ' + e); }
-  try { // MarketBrief 폴더 바로 아래의 24시간 지난 Spark·Briefing 파일([오류] 붙은 것은 확인용으로 남김)
+  try { // MarketBrief 폴더 바로 아래: 배포완료·건너뜀은 바로, 미처리 파일은 24시간 뒤 휴지통([오류] 붙은 것은 확인용으로 남김)
     var cut2 = Date.now() - 24 * 3600 * 1000, it2 = DriveApp.getFolderById(SPARK_FOLDER_ID).getFiles();
     while (it2.hasNext()) {
       var y = it2.next();
-      if (/^(\[(삭제보관|건너뜀|배포완료)\] )?(MarketBrief|Briefing)_/.test(y.getName()) && y.getDateCreated().getTime() < cut2) y.setTrashed(true);
+      var n = y.getName();
+      if (/^\[(삭제보관|건너뜀|배포완료)\] (MarketBrief|Briefing)_/.test(n) || (/^(MarketBrief|Briefing)_/.test(n) && y.getDateCreated().getTime() < cut2)) y.setTrashed(true);
     }
   } catch (e) { Logger.log('Spark 폴더 정리 실패: ' + e); }
 }
