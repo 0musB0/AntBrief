@@ -92,9 +92,17 @@ function adSlot(pos){
       var c = m.rows[i].c || [];
       if (!c[1] || c[1] === "확인 불가") continue;
       out += '<div class="snap ' + (ROWCLS[m.rows[i].d] || "") + '" data-k="' + esc(c[0]) + '"><span class="snap-k">' + c[0]
-           + '</span><span class="snap-v">' + c[1] + '</span><span class="snap-d">' + (c[2] || "") + "</span></div>";
+           + '</span><span class="snap-v">' + c[1] + '</span><span class="snap-d">' + (c[2] || "") + "</span>" + spark(m.rows[i].s) + "</div>";
     }
     return out ? '<div class="snapshot">' + out + "</div>" : "";
+  }
+
+  // 카드 선: Code.gs가 배포 때 Yahoo에서 받은 최근 한 달 일별 종가(마지막 점은 현재가). 없는 회차는 선을 안 그림.
+  function spark(ys){
+    if (!ys || ys.length < 2) return "";
+    var lo = Math.min.apply(null, ys), hi = Math.max.apply(null, ys), span = hi - lo || 1, pts = [];
+    for (var p = 0; p < ys.length; p++) pts.push((p * 100 / (ys.length - 1)).toFixed(1) + "," + (22 - (ys[p] - lo) * 20 / span).toFixed(1));
+    return '<svg class="spark" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><polyline points="' + pts.join(" ") + '"/></svg>';
   }
 
   var STOCKDIR = { up: ["🔺", "상승압력"], down: ["🔻", "하락압력"], neutral: ["➖", "중립"], vol: ["⚡", "양방향"] };
@@ -145,7 +153,7 @@ function adSlot(pos){
       + '<div class="timestamp">' + (d.stamp || "") + "</div>"
       + meta
       + (SLUG ? "" : '<div class="livetape"><p class="livetape-k">지금 시세 <span>미국 지수·원자재는 최대 15분 지연, 코스피·코스닥은 아래 브리핑 숫자 참고 · <a href="https://kr.tradingview.com/" rel="noopener nofollow" target="_blank">TradingView 제공</a></span></p><div id="liveTape"></div></div>'
-        + '<p class="snap-note">브리핑 시점 기준</p>')
+        + '<p class="snap-note">브리핑 시점 기준 · 선은 최근 한 달 일별 종가</p>')
       + snapshot(d.market)
       + stocks(d)
       + (SLUG ? "" : '<div id="favBox"></div>')
@@ -304,30 +312,12 @@ function adSlot(pos){
       el.innerHTML = (list[i + 1] ? link(list[i + 1], "← 이전", list) : "")
         + '<a href="/archive/">전체 목록</a>'
         + (i > 0 ? link(list[i - 1], "다음 →", list) : "");
-      trend(list, i);
+      flow(list, i, app.querySelectorAll(".snap[data-k]"));
       if (!SLUG) favBox(list);
     }).catch(function(){});
   }
 
   function num(v){ var n = parseFloat(String(v == null ? "" : v).replace(/,/g, "")); return isFinite(n) ? n : null; }
-
-  // 카드마다 최근 10회차 추이선과 직전 회차 대비. 값은 list.json의 m(회차별 현재값).
-  function trend(list, i){
-    var cards = app.querySelectorAll(".snap[data-k]");
-    for (var c = 0; c < cards.length; c++){
-      var k = cards[c].getAttribute("data-k"), ys = [];
-      for (var j = Math.min(list.length - 1, i + 9); j >= i; j--){
-        var y = num(list[j].m && list[j].m[k]);
-        if (y !== null && y !== ys[ys.length - 1]) ys.push(y); // 장 마감 뒤 회차는 같은 값이라 한 점으로
-      }
-      if (ys.length < 2) continue;
-      var lo = Math.min.apply(null, ys), hi = Math.max.apply(null, ys), span = hi - lo || 1, pts = [];
-      for (var p = 0; p < ys.length; p++) pts.push((p * 100 / (ys.length - 1)).toFixed(1) + "," + (22 - (ys[p] - lo) * 20 / span).toFixed(1));
-      cards[c].insertAdjacentHTML("beforeend",
-        '<svg class="spark" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><polyline points="' + pts.join(" ") + '"/></svg>');
-    }
-    flow(list, i, cards);
-  }
 
   // 큰 흐름: 지금 값이 최근 20회차(약 1주) 평균보다 1% 넘게 높으면 상승, 낮으면 하락. 금리는 0.05%p.
   function flow(list, i, cards){
