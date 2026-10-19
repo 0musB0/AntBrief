@@ -50,17 +50,16 @@ Apps Script에서 직접 고쳤다면 같은 날 `apps-script/Code.gs`에도 반
 
 ```
 Gemini Spark 예약 (매시 :45)
-  ├─ 브리핑 시간대 → Drive MarketBrief 폴더에 Briefing_YYYY-MM-DD_HHMM 작성
-  └─ 그 외 시간   → MarketBrief_… (수집용)
+  └─ Drive MarketBrief 폴더에 Briefing_YYYY-MM-DD_HHMM 작성 (매시간)
         ↓
-Apps Script publish() (10분마다)
-  Briefing_ 읽기 → 금지어(투자 권유 표현) 검사 → HTML 생성 → 이 저장소에 1커밋
+Apps Script publish() (10분마다 확인, 갱신 시각마다 1번만 배포)
+  가장 최근 Briefing_ 읽기 → 금지어(투자 권유 표현) 검사 → HTML 생성 → 이 저장소에 1커밋
   성공 시 파일명 앞에 [배포완료], 실패 시 [오류] + 알림 메일
         ↓
 Vercel 자동 배포 → antbrief.vercel.app
 ```
 
-브리핑 시간대: 07:00~08:59, 13:00~14:59, 16:00~17:29, 22:00~23:59 (KST)
+갱신 시각: 08:00, 14:00, 16:30, 23:00 (KST, `Code.gs`의 `SLOTS`). 그 회차 배포가 실패하면 다음 갱신 시각 전까지 새로 들어오는 Briefing_으로 다시 시도합니다.
 
 ## 장애 확인 순서
 
