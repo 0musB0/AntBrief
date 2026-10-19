@@ -115,6 +115,7 @@ function publish() {
       }
       checkCompliance_(a);
       var data = merge_(a, s);
+      liveMarket_(data.market);
       var slug = slugOf_(data.stamp);
       var list = readRepoJson_('archive/list.json') || [];
       list = list.filter(function (e) { return e.slug !== slug; });
@@ -301,6 +302,55 @@ function cleanReview_(r) {
   if (!r || !r.text) return null;
   return { prev: String(r.prev || '').slice(0, 30), pick: String(r.pick || '').slice(0, 20), text: String(r.text).slice(0, 300) };
 }
+
+/** 지표 카드 숫자는 Gemini 대신 Yahoo 시세로 덮어쓴다(Gemini가 새 값을 못 찾으면 옛 값을 남기거나 지어내서). 받아오기 실패한 지표는 Gemini 값을 그대로 둔다. */
+var LIVE_SYMBOLS = { '코스피': ['^KS11', 'p'], '코스닥': ['^KQ11', 'p'], '원/달러': ['KRW=X', '원'], 'S&P 500': ['^GSPC', 'p'], '나스닥': ['^IXIC', 'p'],
+  '다우': ['^DJI', 'p'], '브렌트유': ['BZ=F', '$'], 'WTI': ['CL=F', '$'], '금': ['GC=F', '$'], '미 10년물': ['^TNX', '%p'] };
+
+/** 편집기 확인용: 실행 로그에 지표 10개 값이 찍히면 정상. */
+function testLive() {
+  var m = { rows: Object.keys(LIVE_SYMBOLS).map(function (k) { return { c: [k, '확인 불가', '확인 불가', ''] }; }) };
+  liveMarket_(m);
+  Logger.log(m.rows.map(function (r) { return r.c.join(' | '); }).join('\n'));
+}
+
+function liveMarket_(market) {
+  var now = Date.now() / 1000;
+  market.rows.forEach(function (r) {
+    var x = LIVE_SYMBOLS[r.c[0]];
+    if (!x) return;
+    try {
+      var q = quote_(x[0]);
+      var diff = q.price - q.prev, pct = diff / q.prev * 100, sign = diff > 0 ? '+' : diff < 0 ? '-' : '', ad = Math.abs(diff);
+      var p = q.meta.currentTradingPeriod && q.meta.currentTradingPeriod.regular;
+      var open = p && now >= p.start && now < p.end && now - q.meta.regularMarketTime < 3600;
+      var when = open ? Utilities.formatDate(new Date(q.meta.regularMarketTime * 1000), TZ, 'MM/dd HH:mm') + ' 장중'
+        : Utilities.formatDate(new Date(q.meta.regularMarketTime * 1000), q.meta.exchangeTimezoneName || TZ, 'MM/dd') + ' 마감';
+      var chg = x[1] === '%p' ? sign + ad.toFixed(2) + '%p'
+        : (x[1] === '$' ? sign + '$' + num_(ad) : sign + num_(ad) + x[1]) + ' (' + sign + Math.abs(pct).toFixed(2) + '%)';
+      r.c = [r.c[0], x[1] === '%p' ? q.price.toFixed(2) + '%' : num_(q.price), chg, x[0] === 'GC=F' ? when + ' 선물' : when];
+      r.d = diff > 0 ? 'up' : diff < 0 ? 'down' : 'neutral';
+    } catch (e) {
+      Logger.log('시세 건너뜀 ' + r.c[0] + ': ' + e);
+    }
+  });
+}
+
+/** 현재가와 직전 거래일 종가. 일봉 마지막 날이 현재가 날짜면 그 앞날 종가가 직전 종가. */
+function quote_(sym) {
+  var r = UrlFetchApp.fetch('https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(sym) + '?range=10d&interval=1d',
+    { muteHttpExceptions: true, headers: { 'User-Agent': 'Mozilla/5.0' } });
+  if (r.getResponseCode() !== 200) throw new Error(sym + ' ' + r.getResponseCode());
+  var res = JSON.parse(r.getContentText()).chart.result[0], m = res.meta, tz = m.exchangeTimezoneName || TZ, cl = res.indicators.quote[0].close;
+  var day = Utilities.formatDate(new Date(m.regularMarketTime * 1000), tz, 'yyyy-MM-dd'), prev = null;
+  res.timestamp.forEach(function (t, i) {
+    if (cl[i] != null && Utilities.formatDate(new Date(t * 1000), tz, 'yyyy-MM-dd') < day) prev = cl[i];
+  });
+  if (!m.regularMarketPrice || !prev) throw new Error(sym + ' 값 없음');
+  return { price: m.regularMarketPrice, prev: prev, meta: m };
+}
+
+function num_(v) { return v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 
 /** 지표 이름 → 현재값. 사이트 카드의 추이선·직전 회차 대비에 쓴다. */
 function marketMap_(market) {
