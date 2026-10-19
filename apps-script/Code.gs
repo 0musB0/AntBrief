@@ -79,14 +79,26 @@ function bootstrap() {
 /* ===================================== 정기 실행 ===================================== */
 
 var BRIEF_PREFIX = /^Briefing_/;
+var SLOTS = ['08:00', '14:00', '16:30', '23:00']; // 사이트 갱신 시각(KST). Gemini는 매시간 쓰고, 이 시각마다 가장 최근 파일 1개만 올린다.
 // 유사투자자문 회피용 최소 검사. 걸리면 배포 중단 후 메일. 오탐이면 이 목록을 줄이면 됨.
 var BANNED = /(매수|매도|비중\s*(확대|축소))\s*(추천|권유|하세요|하라|하십시오|유효|전략|기회)|(분할|추가)\s*매수(?!세)|저가\s*매수\s*(기회|전략|추천|권유|하세요|하라)|목표\s*주가\s*\d|사세요|파세요|담으세요|지금이\s*(매수|매도)\s*(기회|타이밍)/;
 
-/** 10분마다: Gemini Briefing_ 파일 또는 Claude Analysis_ 파일 중 가장 최신 1개를 배포한다. */
+/** 지금이 속한 갱신 시각 키(예: 2026-10-19 14:00). 08:00 전이면 전날 23:00. */
+function slotKey_(now) {
+  var hm = Utilities.formatDate(now, TZ, 'HH:mm'), cur = null;
+  SLOTS.forEach(function (t) { if (hm >= t) cur = t; });
+  if (cur) return Utilities.formatDate(now, TZ, 'yyyy-MM-dd') + ' ' + cur;
+  return Utilities.formatDate(new Date(now.getTime() - 24 * 3600 * 1000), TZ, 'yyyy-MM-dd') + ' ' + SLOTS[SLOTS.length - 1];
+}
+
+/** 10분마다: 갱신 시각이 지났고 이번 회차를 아직 못 올렸으면, Gemini Briefing_ 파일 또는 Claude Analysis_ 파일 중 가장 최신 1개를 배포한다.
+ *  실패하면 다음 갱신 시각 전까지 새로 들어오는 파일로 계속 다시 시도한다. */
 function publish() {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(1000)) return;
   try {
+    var props = PropertiesService.getScriptProperties(), slot = slotKey_(new Date());
+    if (props.getProperty('LAST_SLOT') === slot) return;
     var job = nextJob_();
     if (!job) return;
     var f = job.file;
@@ -117,6 +129,7 @@ function publish() {
         { path: 'sitemap.xml', text: sitemap_(list) },
         { path: 'feed.xml', text: feedXml_(list) }
       ].concat(termFiles_(list), regimeFiles_()), 'briefing ' + data.short + (job.kind === 'gemini' ? ' (gemini)' : ''));
+      props.setProperty('LAST_SLOT', slot);
       if (job.kind === 'gemini') { f.setName('[배포완료] ' + f.getName()); a.spark_id = null; }
       cleanup_(a.spark_id); // gemini 경로면 방금 배포한 Briefing 파일 자신이 휴지통으로 감
     } catch (e) {
