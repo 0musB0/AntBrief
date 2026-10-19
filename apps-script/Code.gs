@@ -326,7 +326,7 @@ var LIVE_SYMBOLS = { '코스피': ['^KS11', 'p'], '코스닥': ['^KQ11', 'p'], '
 function testLive() {
   var m = { rows: Object.keys(LIVE_SYMBOLS).map(function (k) { return { c: [k, '확인 불가', '확인 불가', ''] }; }) };
   liveMarket_(m);
-  Logger.log(m.rows.map(function (r) { return r.c.join(' | '); }).join('\n'));
+  Logger.log(m.rows.map(function (r) { return r.c.join(' | ') + ' | 선 ' + (r.s ? r.s.length + '점' : '없음'); }).join('\n'));
 }
 
 function liveMarket_(market) {
@@ -345,6 +345,7 @@ function liveMarket_(market) {
         : (x[1] === '$' ? sign + '$' + num_(ad) : sign + num_(ad) + x[1]) + ' (' + sign + Math.abs(pct).toFixed(2) + '%)';
       r.c = [r.c[0], x[1] === '%p' ? q.price.toFixed(2) + '%' : num_(q.price), chg, x[0] === 'GC=F' ? when + ' 선물' : when];
       r.d = diff > 0 ? 'up' : diff < 0 ? 'down' : 'neutral';
+      r.s = q.closes.map(function (v) { return Math.round(v * 100) / 100; }); // 카드 선: 실제 일별 종가 + 현재가
     } catch (e) {
       Logger.log('시세 건너뜀 ' + r.c[0] + ': ' + e);
     }
@@ -378,23 +379,23 @@ function testStale() {
   Logger.log(best.getName() + ' → ' + (staleReason_(parseJson_(readText_(best)).market) || '통과'));
 }
 
-/** 현재가와 직전 거래일 종가. 일봉 마지막 날이 현재가 날짜면 그 앞날 종가가 직전 종가. */
+/** 현재가, 직전 거래일 종가, 최근 한 달 일별 종가(마지막은 현재가). 일봉 마지막 날이 현재가 날짜면 그 앞날 종가가 직전 종가. */
 function quote_(sym) {
-  var r = UrlFetchApp.fetch('https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(sym) + '?range=10d&interval=1d',
+  var r = UrlFetchApp.fetch('https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(sym) + '?range=1mo&interval=1d',
     { muteHttpExceptions: true, headers: { 'User-Agent': 'Mozilla/5.0' } });
   if (r.getResponseCode() !== 200) throw new Error(sym + ' ' + r.getResponseCode());
   var res = JSON.parse(r.getContentText()).chart.result[0], m = res.meta, tz = m.exchangeTimezoneName || TZ, cl = res.indicators.quote[0].close;
-  var day = Utilities.formatDate(new Date(m.regularMarketTime * 1000), tz, 'yyyy-MM-dd'), prev = null;
+  var day = Utilities.formatDate(new Date(m.regularMarketTime * 1000), tz, 'yyyy-MM-dd'), prev = null, closes = [];
   res.timestamp.forEach(function (t, i) {
-    if (cl[i] != null && Utilities.formatDate(new Date(t * 1000), tz, 'yyyy-MM-dd') < day) prev = cl[i];
+    if (cl[i] != null && Utilities.formatDate(new Date(t * 1000), tz, 'yyyy-MM-dd') < day) { prev = cl[i]; closes.push(cl[i]); }
   });
   if (!m.regularMarketPrice || !prev) throw new Error(sym + ' 값 없음');
-  return { price: m.regularMarketPrice, prev: prev, meta: m };
+  return { price: m.regularMarketPrice, prev: prev, meta: m, closes: closes.concat(m.regularMarketPrice) };
 }
 
 function num_(v) { return v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 
-/** 지표 이름 → 현재값. 사이트 카드의 추이선·직전 회차 대비에 쓴다. */
+/** 지표 이름 → 현재값. 사이트 카드의 추세 배지(최근 20회차 평균 대비)에 쓴다. */
 function marketMap_(market) {
   var o = {};
   ((market && market.rows) || []).forEach(function (r) {
