@@ -67,7 +67,7 @@ Vercel 자동 배포 → antbrief.vercel.app
    ```sh
    curl -s "https://antbrief.vercel.app/?nc=$(date +%s)" | grep -o '"stamp":"[^"]*"'
    ```
-2. Drive MarketBrief 폴더: 최근 `Briefing_` 파일이 있는지, `[오류]` 표시 확인 (배포된 파일은 바로 휴지통으로 가요)
+2. Drive MarketBrief 폴더: 최근 `Briefing_` 파일이 있는지, `[오류]` 표시 확인 (24시간 지난 파일은 archive 폴더까지 자동으로 휴지통으로 가요)
 3. "브리핑 배포 실패" 메일로 원인 확인. 고친 뒤 파일명에서 `[오류] `를 지우면 다음 실행 때 재시도
 4. 이 저장소 최근 커밋 → Vercel 배포가 READY인지 확인
 
