@@ -114,6 +114,16 @@ function publish() {
         s = a.spark_id ? parseJson_(readText_(DriveApp.getFileById(a.spark_id))) : {};
       }
       checkCompliance_(a);
+      var stale = job.kind === 'gemini' && staleReason_(s.market);
+      if (stale) { // 지난 장 데이터로 쓴 글이면 올리지 않고, 다음 실행에서 더 새 파일을 기다린다
+        f.setName('[지난시황] ' + f.getName());
+        if (props.getProperty('STALE_SLOT') !== slot) { // 회차마다 한 번만 알림
+          props.setProperty('STALE_SLOT', slot);
+          MailApp.sendEmail(Session.getEffectiveUser().getEmail(), '[섬개미] 지난 시황 브리핑 보류',
+            '파일: ' + f.getName() + '\n이유: ' + stale + '\n\n사이트는 직전 브리핑을 유지하고, 다음 갱신 시각 전까지 Gemini가 새로 쓰는 파일로 다시 시도합니다.');
+        }
+        return;
+      }
       var data = merge_(a, s);
       liveMarket_(data.market);
       var slug = slugOf_(data.stamp);
@@ -186,7 +196,7 @@ function cleanup_(sparkId) {
     var cut2 = Date.now() - 24 * 3600 * 1000, folder = DriveApp.getFolderById(SPARK_FOLDER_ID), it2 = folder.getFiles();
     while (it2.hasNext()) {
       var y = it2.next();
-      if (/^(\[(삭제보관|건너뜀|배포완료)\] )?(MarketBrief|Briefing)_/.test(y.getName()) && y.getDateCreated().getTime() < cut2) y.setTrashed(true);
+      if (/^(\[(삭제보관|건너뜀|배포완료|지난시황)\] )?(MarketBrief|Briefing)_/.test(y.getName()) && y.getDateCreated().getTime() < cut2) y.setTrashed(true);
     }
     var subs = folder.getFoldersByName('MarketBrief_archive');
     while (subs.hasNext()) {
@@ -339,6 +349,33 @@ function liveMarket_(market) {
       Logger.log('시세 건너뜀 ' + r.c[0] + ': ' + e);
     }
   });
+}
+
+/** Gemini가 쓴 코스피 행이 실제 최근 거래일과 다르면 이유 문자열, 같으면 ''.
+ *  기준 시점 날짜(MM/DD)가 Yahoo 최근 거래일과 다르거나, 날짜를 못 읽으면 값이 1% 넘게 다를 때 지난 시황으로 본다.
+ *  코스피만 본다: 미국 지수는 23:00 회차 직전에 개장해서 날짜가 바뀌는 게 정상이라 오탐이 난다. */
+function staleReason_(market) {
+  var row = ((market && market.rows) || []).filter(function (r) { return r.c && r.c[0] === '코스피'; })[0];
+  if (!row) return '코스피 행 없음';
+  var q;
+  try { q = quote_('^KS11'); } catch (e) { return ''; } // 시세를 못 받으면 막지 않는다
+  var live = Utilities.formatDate(new Date(q.meta.regularMarketTime * 1000), TZ, 'MM/dd');
+  var m = String(row.c[3] || '').match(/(\d{1,2})\/(\d{1,2})/);
+  if (m) {
+    var got = ('0' + m[1]).slice(-2) + '/' + ('0' + m[2]).slice(-2);
+    return got === live ? '' : '코스피 기준 시점 ' + got + ', 실제 최근 거래일 ' + live;
+  }
+  var v = parseFloat(String(row.c[1] || '').replace(/,/g, ''));
+  if (!v) return '코스피 값 없음';
+  return Math.abs(v - q.price) / q.price > 0.01 ? '코스피 ' + row.c[1] + ', 실제 ' + num_(q.price) : '';
+}
+
+/** 편집기 확인용: 지금 Drive의 가장 최근 Briefing_ 파일이 지난 시황 검사에 걸리는지 로그로 본다(파일 이름은 안 바꾼다). */
+function testStale() {
+  var it = DriveApp.getFolderById(SPARK_FOLDER_ID).getFiles(), best = null;
+  while (it.hasNext()) { var x = it.next(); if (/Briefing_/.test(x.getName()) && (!best || x.getDateCreated() > best.getDateCreated())) best = x; }
+  if (!best) return Logger.log('Briefing_ 파일 없음');
+  Logger.log(best.getName() + ' → ' + (staleReason_(parseJson_(readText_(best)).market) || '통과'));
 }
 
 /** 현재가와 직전 거래일 종가. 일봉 마지막 날이 현재가 날짜면 그 앞날 종가가 직전 종가. */
