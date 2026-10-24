@@ -353,7 +353,7 @@ function liveMarket_(market) {
 }
 
 /** Gemini가 쓴 코스피 행이 실제 최근 거래일과 다르면 이유 문자열, 같으면 ''.
- *  기준 시점 날짜(MM/DD)가 Yahoo 최근 거래일과 다르거나, 날짜를 못 읽으면 값이 1% 넘게 다를 때 지난 시황으로 본다.
+ *  기준 시점 날짜(MM/DD)가 Yahoo 최근 거래일과 다르거나, 값이 1% 넘게 다르면 지난 시황으로 본다.
  *  코스피만 본다: 미국 지수는 23:00 회차 직전에 개장해서 날짜가 바뀌는 게 정상이라 오탐이 난다. */
 function staleReason_(market) {
   var row = ((market && market.rows) || []).filter(function (r) { return r.c && r.c[0] === '코스피'; })[0];
@@ -364,11 +364,12 @@ function staleReason_(market) {
   var m = String(row.c[3] || '').match(/(\d{1,2})\/(\d{1,2})/);
   if (m) {
     var got = ('0' + m[1]).slice(-2) + '/' + ('0' + m[2]).slice(-2);
-    return got === live ? '' : '코스피 기준 시점 ' + got + ', 실제 최근 거래일 ' + live;
+    if (got !== live) return '코스피 기준 시점 ' + got + ', 실제 최근 거래일 ' + live;
   }
+  // 날짜가 맞아도 값이 1% 넘게 다르면 막는다: 표는 Yahoo로 덮어쓰지만 제목·요약·해설은 Gemini 숫자 그대로라 한 페이지에 숫자가 둘이 된다(10/23 14:00 5384 vs 5474)
   var v = parseFloat(String(row.c[1] || '').replace(/,/g, ''));
   if (!v) return '코스피 값 없음';
-  return Math.abs(v - q.price) / q.price > 0.01 ? '코스피 ' + row.c[1] + ', 실제 ' + num_(q.price) : '';
+  return Math.abs(v - q.price) / q.price > 0.01 ? '코스피 ' + row.c[1] + ', 실제 ' + num_(q.price) + ' (본문 숫자가 표와 달라짐)' : '';
 }
 
 /** 편집기 확인용: 지금 Drive의 가장 최근 Briefing_ 파일이 지난 시황 검사에 걸리는지 로그로 본다(파일 이름은 안 바꾼다). */
