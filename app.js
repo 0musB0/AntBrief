@@ -151,6 +151,7 @@ function adSlot(pos){
       + '<span class="kicker">Market Briefing · KOSPI / KOSDAQ</span>'
       + '<h1 class="title">' + headline + "</h1>"
       + '<div class="timestamp">' + (d.stamp || "") + "</div>"
+      + '<nav class="in-links top" aria-label="브리핑 이동"></nav>'
       + meta
       + (SLUG ? "" : '<div class="livetape"><p class="livetape-k">지금 시세 <span>미국 지수·원자재는 최대 15분 지연, 코스피·코스닥은 아래 브리핑 숫자 참고 · <a href="https://kr.tradingview.com/" rel="noopener nofollow" target="_blank">TradingView 제공</a></span></p><div id="liveTape"></div></div>'
         + '<p class="snap-note">브리핑 시점 기준 · 선은 최근 한 달 일별 종가</p>')
@@ -212,7 +213,7 @@ function adSlot(pos){
     }
     h += section("04", "시나리오", s4);
     h += '<nav class="issuenav" aria-label="브리핑 이동"><button type="button" class="sharebtn" id="shareBtn">공유하기</button>'
-       + '<span class="in-links" id="issueLinks"><a href="/archive/">지난 브리핑 전체</a></span></nav>';
+       + '<span class="in-links"><a href="/archive/">지난 브리핑 전체</a></span></nav>';
 
     h += adSlot("bottom");
 
@@ -298,20 +299,21 @@ function adSlot(pos){
 
   function link(it, label, list){
     var href = it === list[0] ? "/" : "/archive/" + encodeURIComponent(it.slug) + ".html";
-    return '<a href="' + href + '" title="' + esc(it.sub) + '">' + label + " <span>" + esc(it.short) + "</span></a>";
+    return '<a href="' + href + '" title="' + esc(it.sub) + '">' + label + " <span>" + esc(String(it.short).replace(" KST", "")) + "</span></a>";
   }
 
   function fillNav(){
     if (!window.fetch) return;
     fetch("/archive/list.json", { cache: "no-cache" }).then(function(r){ return r.json(); }).then(function(list){
-      var el = document.getElementById("issueLinks");
+      var els = app.querySelectorAll(".in-links");
       var i = 0;
       if (SLUG){ while (i < list.length && list[i].slug !== SLUG) i++; }
-      if (!el || !list[i]) return;
+      if (!list[i]) return;
       permalink = location.origin + "/archive/" + list[i].slug + ".html";
-      el.innerHTML = (list[i + 1] ? link(list[i + 1], "← 이전", list) : "")
-        + '<a href="/archive/">전체 목록</a>'
-        + (i > 0 ? link(list[i - 1], "다음 →", list) : "");
+      var nav = (list[i + 1] ? link(list[i + 1], "← 이전 브리핑", list) : "<span></span>")
+        + '<a href="/archive/" class="all">전체 목록</a>'
+        + (i > 0 ? link(list[i - 1], "다음 브리핑 →", list) : "<span></span>");
+      for (var e = 0; e < els.length; e++) els[e].innerHTML = nav;
       flow(list, i, app.querySelectorAll(".snap[data-k]"));
       if (!SLUG) favBox(list);
     }).catch(function(){});
