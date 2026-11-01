@@ -133,15 +133,17 @@ function publish() {
       list = list.filter(function (e) { return e.slug !== slug; });
       list.unshift({ slug: slug, short: data.short, sub: data.sub, stocks: data.stocks, m: marketMap_(data.market) });
       list = list.slice(0, ARCHIVE_MAX);
+      var weeks = readRepoJson_('weekly/list.json') || [], weekFiles = [];
+      if (weekday_(slot) === '6') { var w = weeklyFiles_(list, weeks, readRepoText_('weekly/comment.txt')); weeks = w.weeks; weekFiles = w.files; }
       commitFiles_([
         { path: 'index.html', text: buildPage_(data, SITE + '/') },
         { path: 'archive/' + slug + '.html', text: buildPage_(data, SITE + '/archive/' + slug + '.html', !indexed_(slug, list)) },
         { path: 'archive/index.html', text: archiveIndex_(list) },
         { path: 'archive/list.json', text: JSON.stringify(list) },
         { path: 'calendar.html', text: calendarPage_(data) },
-        { path: 'sitemap.xml', text: sitemap_(list) },
+        { path: 'sitemap.xml', text: sitemap_(list, weeks) },
         { path: 'feed.xml', text: feedXml_(list) }
-      ].concat(termFiles_(list), regimeFiles_()), 'briefing ' + data.short + (job.kind === 'gemini' ? ' (gemini)' : ''));
+      ].concat(termFiles_(list), regimeFiles_(), weekFiles), 'briefing ' + data.short + (job.kind === 'gemini' ? ' (gemini)' : ''));
       props.setProperty('LAST_SLOT', slot);
       if (job.kind === 'gemini') { f.setName('[배포완료] ' + f.getName()); a.spark_id = null; }
       cleanup_(a.spark_id); // gemini 경로면 spark_id가 null이라 방금 배포한 파일은 24시간 뒤 정리에서 지워짐
@@ -159,8 +161,49 @@ function publish() {
 
 /** 토요일은 08:00(미국 금요일 마감) 회차만, 일요일은 전부 건너뛴다. 장이 쉬는 동안 거의 같은 글이 반복되기 때문. */
 function weekendSkip_(slot) {
-  var wd = Utilities.formatDate(new Date(slot.slice(0, 10) + 'T12:00:00+09:00'), TZ, 'u'); // 6 토, 7 일
+  var wd = weekday_(slot);
   return wd === '7' || (wd === '6' && slot.slice(11) !== '08:00');
+}
+
+/** 갱신 시각 키의 요일: '1' 월 … '6' 토, '7' 일 */
+function weekday_(slot) { return Utilities.formatDate(new Date(slot.slice(0, 10) + 'T12:00:00+09:00'), TZ, 'u'); }
+
+/** 토요일 08:00 회차: 월요일 아침~토요일 아침 회차를 묶은 주간 정리 페이지(/weekly/yyyyMMdd.html)와 목록.
+ *  운영자 한마디는 저장소 weekly/comment.txt에서 읽고, 쓴 뒤에는 비운다(다음 주에 같은 글이 또 나오지 않게). */
+function weeklyFiles_(list, weeks, comment) {
+  var end = list[0], d = end.slug.slice(0, 8);
+  var mon = new Date(Date.UTC(+d.slice(0, 4), +d.slice(4, 6) - 1, +d.slice(6, 8) - 5)).toISOString().slice(0, 10).replace(/-/g, '');
+  var wk = list.filter(function (e) { var x = e.slug.slice(0, 8); return x >= mon && x <= d; }), first = wk[wk.length - 1];
+  var md = function (x) { return +x.slice(4, 6) + '/' + +x.slice(6, 8); };
+  var title = md(mon) + '~' + md(d) + ' 이번 주 증시 정리';
+  var n = function (v) { return parseFloat(String(v || '').replace(/[,%]/g, '')); };
+  var rows = Object.keys(end.m || {}).map(function (k) {
+    var a = n(first.m && first.m[k]), b = n(end.m[k]), c = '확인 불가';
+    if (a && b) c = /10년물/.test(k) ? (b - a >= 0 ? '+' : '') + (b - a).toFixed(2) + '%p' : (b - a >= 0 ? '+' : '') + ((b - a) / a * 100).toFixed(2) + '%';
+    return { c: [k, (first.m && first.m[k]) || '확인 불가', end.m[k], c] };
+  });
+  var freq = {};
+  wk.forEach(function (e) { (e.stocks || []).forEach(function (x) { freq[x] = (freq[x] || 0) + 1; }); });
+  var top = Object.keys(freq).sort(function (x, y) { return freq[y] - freq[x]; }).slice(0, 10);
+  var days = wk.filter(function (e) { return indexed_(e.slug, list); }).reverse();
+  var body = '<p><a href="/weekly/">← 주간 정리 목록</a></p><h1>' + esc_(title) + '</h1>' +
+    '<p>' + md(mon) + '(월) 아침부터 ' + md(d) + '(토) 아침까지 올라간 브리핑 ' + wk.length + '개 회차를 한 페이지로 묶었습니다.</p>' +
+    (comment && comment.trim() ? '<h2>운영자 한마디</h2><p>' + esc_(comment.trim()).replace(/\n/g, '<br>') + '</p><p class="pre-m">— 무스비</p>' : '') +
+    '<h2>한 주 지표 변화</h2><div class="pre" style="padding:0">' + tbl_({ head: ['지표', md(first.slug) + ' 아침', md(d) + ' 아침', '주간 변화'], rows: rows }) + '</div>' +
+    '<p class="pre-m">월요일 아침 값은 직전 금요일 마감, 토요일 아침 값은 이번 주 금요일 마감 기준입니다. 정확한 기준 시점은 각 날짜의 브리핑에 있습니다.</p>' +
+    '<h2>날짜별 핵심 뉴스</h2><ul>' + days.map(function (e) { return '<li><a href="/archive/' + esc_(e.slug) + '.html">' + esc_(md(e.slug)) + '</a> ' + esc_(e.sub) + '</li>'; }).join('') + '</ul>' +
+    (top.length ? '<h2>이번 주 많이 나온 종목</h2><p class="tags">' + top.map(function (x) { return tag_(x) + '<span class="pre-m">' + freq[x] + '회</span>'; }).join(' ') + '</p>' : '') +
+    '<p class="pre-m">' + DISCLAIMER + '</p>';
+  weeks = [{ slug: d, title: title }].concat(weeks.filter(function (w) { return w.slug !== d; }));
+  var idx = '<h1>주간 정리</h1><p>매주 토요일 아침, 한 주 동안의 지표 변화와 날짜별 핵심 뉴스를 묶어 정리합니다.</p><ul>' +
+    weeks.map(function (w) { return '<li><a href="/weekly/' + w.slug + '.html">' + esc_(w.title) + '</a></li>'; }).join('') + '</ul>';
+  var files = [
+    { path: 'weekly/' + d + '.html', text: simplePage_(title, '/weekly/' + d + '.html', body, title + ': 코스피·코스닥·환율·미국 증시·유가 한 주 변화와 날짜별 핵심 뉴스') },
+    { path: 'weekly/index.html', text: simplePage_('주간 정리', '/weekly/', idx) },
+    { path: 'weekly/list.json', text: JSON.stringify(weeks) }
+  ];
+  if (comment && comment.trim()) files.push({ path: 'weekly/comment.txt', text: '' });
+  return { weeks: weeks, files: files };
 }
 
 /** 그날 가장 이른 회차만 검색에 노출한다. 나머지 회차 페이지는 noindex, 사이트맵에서도 뺀다(비슷한 페이지가 많으면 '가치 없는 콘텐츠'로 본다). */
@@ -547,7 +590,7 @@ var NAV_CSS = '.top-nav{max-width:860px;margin:0 auto;padding:0 16px;display:fle
   '.top-nav a{display:inline-flex;align-items:center;min-height:40px;padding:0 10px;color:#9aa0a6;text-decoration:none}.top-nav a:hover{color:#eceee9}' +
   '.top-nav .brand{color:#eceee9;font-weight:700;font-size:15px;padding-left:0;margin-right:auto}';
 
-var NAV = '<nav class="top-nav" aria-label="주요 메뉴"><a class="brand" href="/">섬개미 증시 브리핑</a><a href="/">최신 브리핑</a><a href="/archive/">지난 브리핑</a><a href="/calendar.html">일정</a><a href="/glossary.html">용어</a><a href="/about.html">소개</a><a href="/contact.html">문의</a></nav>';
+var NAV = '<nav class="top-nav" aria-label="주요 메뉴"><a class="brand" href="/">섬개미 증시 브리핑</a><a href="/">최신 브리핑</a><a href="/archive/">지난 브리핑</a><a href="/weekly/">주간 정리</a><a href="/calendar.html">일정</a><a href="/glossary.html">용어</a><a href="/about.html">소개</a><a href="/contact.html">문의</a></nav>';
 
 var HEAD_COMMON =
   '<meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">' +
@@ -569,7 +612,7 @@ var HEAD_COMMON =
 var HEAD_ADS =
   '<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4554703495384988"\n     crossorigin="anonymous"></script>\n';
 
-var FOOT = '<nav class="site-foot"><a href="/">최신 브리핑</a><a href="/archive/">지난 브리핑</a><a href="/calendar.html">이번 주 일정</a><a href="/glossary.html">용어 풀이</a><a href="/about.html">소개</a><a href="/contact.html">문의</a><a href="/privacy.html">개인정보처리방침</a></nav>';
+var FOOT = '<nav class="site-foot"><a href="/">최신 브리핑</a><a href="/archive/">지난 브리핑</a><a href="/weekly/">주간 정리</a><a href="/calendar.html">이번 주 일정</a><a href="/glossary.html">용어 풀이</a><a href="/about.html">소개</a><a href="/contact.html">문의</a><a href="/privacy.html">개인정보처리방침</a></nav>';
 
 /** stamp "2026/10/15(목) 08:39 KST" → "2026-10-15T08:39:00+09:00" */
 function isoOf_(stamp) {
@@ -713,11 +756,14 @@ function archiveIndex_(list) {
   return simplePage_('지난 브리핑', '/archive/', body);
 }
 
-function sitemap_(list) {
-  var urls = ['/', '/about.html', '/privacy.html', '/archive/', '/contact.html', '/calendar.html', '/glossary.html'].concat(GLOSSARY.map(function (g) { return '/glossary/' + g[0] + '.html'; })).concat(list.filter(function (e) { return indexed_(e.slug, list); }).map(function (e) { return '/archive/' + e.slug + '.html'; }));
+function sitemap_(list, weeks) {
+  weeks = weeks || [];
+  var urls = ['/', '/about.html', '/privacy.html', '/archive/', '/contact.html', '/calendar.html', '/glossary.html'].concat(weeks.length ? ['/weekly/'] : []).concat(weeks.map(function (w) { return '/weekly/' + w.slug + '.html'; })).concat(GLOSSARY.map(function (g) { return '/glossary/' + g[0] + '.html'; })).concat(list.filter(function (e) { return indexed_(e.slug, list); }).map(function (e) { return '/archive/' + e.slug + '.html'; }));
   var day = function (slug) { return slug.slice(0, 4) + '-' + slug.slice(4, 6) + '-' + slug.slice(6, 8); };
   var mod = { '/': list[0] && day(list[0].slug), '/archive/': list[0] && day(list[0].slug), '/calendar.html': list[0] && day(list[0].slug) };
   list.forEach(function (e) { mod['/archive/' + e.slug + '.html'] = day(e.slug); });
+  weeks.forEach(function (w) { mod['/weekly/' + w.slug + '.html'] = day(w.slug); });
+  if (weeks[0]) mod['/weekly/'] = day(weeks[0].slug);
   return '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
     urls.map(function (u) { return '<url><loc>' + SITE + u + '</loc>' + (mod[u] ? '<lastmod>' + mod[u] + '</lastmod>' : '') + '</url>'; }).join('') + '</urlset>\n';
 }
@@ -905,7 +951,7 @@ function rebuildAll() {
     files.push({ path: 'glossary.html', text: glossaryPage_() });
     files = files.concat(termFiles_(list));
     files.push({ path: 'archive/index.html', text: archiveIndex_(list) });
-    files.push({ path: 'sitemap.xml', text: sitemap_(list) });
+    files.push({ path: 'sitemap.xml', text: sitemap_(list, readRepoJson_('weekly/list.json') || []) });
     files.push({ path: 'feed.xml', text: feedXml_(list) });
     var c = readRepoText_('contact.html');
     if (c && c.indexOf('class="top-nav"') < 0) {
