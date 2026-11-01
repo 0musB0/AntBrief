@@ -373,7 +373,7 @@ function adSlot(pos){
           + '<div class="rg-bar" aria-hidden="true">' + bar + '</div><div class="rg-years" aria-hidden="true">' + yrs + "</div></div>";
       }
       if (!out) return;
-      el.innerHTML = '<div class="regime"><p class="rg-title">큰 흐름 · 상승장과 하락장</p><div class="rg-grid">' + out + "</div>"
+      el.innerHTML = '<div class="regime"><p class="rg-title">큰 흐름 · 상승장과 하락장 <a href="/regime.html">자세히 보기</a></p><div class="rg-grid">' + out + "</div>"
         + '<p class="rg-note">고점에서 기준(한국 15%, 미국 20%)보다 많이 내리면 하락장, 저점에서 그만큼 오르면 상승장으로 나눕니다(지수 종가, ' + esc(j.idx[0].asof) + " 기준). "
         + "전환 조짐은 200일선·50일선 위치와 고점·저점에서 10% 넘게 움직였는지 3가지 중 2가지 이상이 반대쪽을 가리킬 때입니다. 지난 흐름을 정리한 것이며 앞으로의 방향을 예측하거나 매매를 권하는 것이 아닙니다.</p></div>";
     }).catch(function(){});
