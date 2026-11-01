@@ -99,6 +99,7 @@ function publish() {
   try {
     var props = PropertiesService.getScriptProperties(), slot = slotKey_(new Date());
     if (props.getProperty('LAST_SLOT') === slot) return;
+    if (weekendSkip_(slot)) { props.setProperty('LAST_SLOT', slot); return; } // 주말엔 토요일 08:00만 (애드센스 '가치 없는 콘텐츠': 같은 글 반복 방지)
     var job = nextJob_();
     if (!job) return;
     var f = job.file;
@@ -124,16 +125,17 @@ function publish() {
         }
         return;
       }
+      var list = readRepoJson_('archive/list.json') || [];
+      if (list[0] && list[0].sub === a.sub) { f.setName('[중복] ' + f.getName()); return; } // 직전 회차와 제목이 같으면 올리지 않고 더 새 파일을 기다린다
       var data = merge_(a, s);
       liveMarket_(data.market);
       var slug = slugOf_(data.stamp);
-      var list = readRepoJson_('archive/list.json') || [];
       list = list.filter(function (e) { return e.slug !== slug; });
       list.unshift({ slug: slug, short: data.short, sub: data.sub, stocks: data.stocks, m: marketMap_(data.market) });
       list = list.slice(0, ARCHIVE_MAX);
       commitFiles_([
         { path: 'index.html', text: buildPage_(data, SITE + '/') },
-        { path: 'archive/' + slug + '.html', text: buildPage_(data, SITE + '/archive/' + slug + '.html') },
+        { path: 'archive/' + slug + '.html', text: buildPage_(data, SITE + '/archive/' + slug + '.html', !indexed_(slug, list)) },
         { path: 'archive/index.html', text: archiveIndex_(list) },
         { path: 'archive/list.json', text: JSON.stringify(list) },
         { path: 'calendar.html', text: calendarPage_(data) },
@@ -153,6 +155,17 @@ function publish() {
   } finally {
     lock.releaseLock();
   }
+}
+
+/** 토요일은 08:00(미국 금요일 마감) 회차만, 일요일은 전부 건너뛴다. 장이 쉬는 동안 거의 같은 글이 반복되기 때문. */
+function weekendSkip_(slot) {
+  var wd = Utilities.formatDate(new Date(slot.slice(0, 10) + 'T12:00:00+09:00'), TZ, 'u'); // 6 토, 7 일
+  return wd === '7' || (wd === '6' && slot.slice(11) !== '08:00');
+}
+
+/** 그날 가장 이른 회차만 검색에 노출한다. 나머지 회차 페이지는 noindex, 사이트맵에서도 뺀다(비슷한 페이지가 많으면 '가치 없는 콘텐츠'로 본다). */
+function indexed_(slug, list) {
+  return !list.some(function (e) { return e.slug.slice(0, 8) === slug.slice(0, 8) && e.slug < slug; });
 }
 
 /** 두 폴더에서 처리할 파일을 고른다. 각 폴더의 오래된 미처리 파일과, 더 오래된 쪽 폴더의 최신 파일은 [건너뜀] 처리. */
@@ -579,12 +592,13 @@ function jsonLd_(d, canonical) {
   return '<script type="application/ld+json">' + JSON.stringify(o).replace(/</g, '\\u003c') + '</script>';
 }
 
-function buildPage_(d, canonical) {
+function buildPage_(d, canonical, noindex) {
   var title = headline_(d) + ' | 섬개미 증시 브리핑';
   var json = JSON.stringify(d).replace(/</g, '\\u003c'); // </script>·<!-- 원천 차단 (JSON으로는 동일한 값)
   return '<!doctype html><html lang="ko"><head>' + HEAD_COMMON + HEAD_ADS +
     '<meta name="description" content="' + esc_(d.sub + ' — 코스피·코스닥·환율·유가 등 국내외 증시 지표 정리. 투자 권유가 아닌 정보 제공 목적입니다.') + '">' +
     '<meta property="og:title" content="' + esc_(title) + '"><meta property="og:description" content="' + esc_(d.sub) + '"><meta property="og:url" content="' + canonical + '">' +
+    (noindex ? '<meta name="robots" content="noindex,follow">' : '') +
     '<link rel="canonical" href="' + canonical + '">' + jsonLd_(d, canonical) + '\n<link rel="stylesheet" href="/style.css">\n<title>' + esc_(title) + '</title></head><body>\n' + NAV + '\n' +
     '<div id="app">' + prerender_(d) + '</div>\n' + FOOT + '\n' +
     '<script type="application/json" id="briefing-data">' + json + '</script>\n<script src="/app.js"></script>\n' +
@@ -659,8 +673,9 @@ function aboutPage_() {
   return simplePage_('소개', '/about.html',
     '<h1>섬개미 증시 브리핑 소개</h1>' +
     '<p>섬개미 증시 브리핑은 코스피·코스닥, 원/달러 환율, 미국 3대 지수, 국제유가, 미국 국채금리 등 개인 투자자가 매일 확인하는 국내외 시장 지표와 주요 뉴스를 한 화면에 정리하는 무료 마켓 브리핑입니다.</p>' +
-    '<h2>업데이트 주기</h2><p>하루 4회(KST 08시, 14시, 16시 30분, 23시) 갱신합니다. 각 지표에는 기준 시점을 함께 표기하며, 장중 수치와 마감 확정치를 구분합니다.</p>' +
-    '<h2>작성 방식</h2><p>공개된 언론 보도와 시장 지표를 자동화 도구로 수집하고, AI 분석 도구를 활용해 뉴스별 중요도·방향·시나리오를 정리합니다. 모든 브리핑에는 원문 출처를 표기하며, 확인되지 않은 수치는 확인 불가로 표시합니다. 지난 브리핑은 <a href="/archive/">아카이브</a>에서 볼 수 있습니다.</p>' +
+    '<h2>운영자</h2><p>운영자 무스비입니다. 제주도 사는 개미입니다. 반갑습니다. 원하시는 사항 있으시면 언제나 <a href="/contact.html">문의</a>해 주세요.</p>' +
+    '<h2>업데이트 주기</h2><p>평일 하루 4회(KST 08시, 14시, 16시 30분, 23시) 갱신합니다. 장이 쉬는 주말에는 토요일 아침 08시(미국 금요일 마감) 한 번만 올립니다. 각 지표에는 기준 시점을 함께 표기하며, 장중 수치와 마감 확정치를 구분합니다.</p>' +
+    '<h2>작성 방식</h2><p>공개된 언론 보도와 시장 지표를 자동화 도구로 수집하고, AI 분석 도구를 활용해 뉴스별 중요도·방향·시나리오를 정리합니다. 모든 브리핑에는 원문 출처를 표기하며, 확인되지 않은 수치는 확인 불가로 표시합니다. 올라간 브리핑은 하루 4번 뉴스 원문·공식 발표와 다시 대조해 틀린 수치나 일정을 바로잡습니다. 지난 브리핑은 <a href="/archive/">아카이브</a>에서 볼 수 있습니다.</p>' +
     '<h2>구독</h2><p>RSS 리더에서 <a href="/feed.xml">' + SITE + '/feed.xml</a> 주소로 새 브리핑을 받아볼 수 있습니다.</p>' +
     '<h2>유의 사항</h2><p>' + DISCLAIMER + ' 특정 종목의 매수·매도를 권유하지 않습니다. 수치는 출처 기준이며 지연되거나 실제와 다를 수 있습니다.</p>' +
     (CONTACT_EMAIL ? '<h2>문의</h2><p>' + esc_(CONTACT_EMAIL) + '</p>' : ''));
@@ -699,7 +714,7 @@ function archiveIndex_(list) {
 }
 
 function sitemap_(list) {
-  var urls = ['/', '/about.html', '/privacy.html', '/archive/', '/contact.html', '/calendar.html', '/glossary.html'].concat(GLOSSARY.map(function (g) { return '/glossary/' + g[0] + '.html'; })).concat(list.map(function (e) { return '/archive/' + e.slug + '.html'; }));
+  var urls = ['/', '/about.html', '/privacy.html', '/archive/', '/contact.html', '/calendar.html', '/glossary.html'].concat(GLOSSARY.map(function (g) { return '/glossary/' + g[0] + '.html'; })).concat(list.filter(function (e) { return indexed_(e.slug, list); }).map(function (e) { return '/archive/' + e.slug + '.html'; }));
   var day = function (slug) { return slug.slice(0, 4) + '-' + slug.slice(4, 6) + '-' + slug.slice(6, 8); };
   var mod = { '/': list[0] && day(list[0].slug), '/archive/': list[0] && day(list[0].slug), '/calendar.html': list[0] && day(list[0].slug) };
   list.forEach(function (e) { mod['/archive/' + e.slug + '.html'] = day(e.slug); });
@@ -871,19 +886,19 @@ function rebuildAll() {
   if (!lock.tryLock(30000)) throw new Error('publish가 실행 중입니다. 잠시 후 다시 실행하세요.');
   try {
     var list = readRepoJson_('archive/list.json') || [], files = [];
-    function redo(path, canonical) {
+    function redo(path, canonical, noindex) {
       var txt = readRepoText_(path);
       var m = txt && txt.match(/<script type="application\/json" id="briefing-data">([\s\S]*?)<\/script>/);
       if (!m) { Logger.log('건너뜀(데이터 없음): ' + path); return; }
       var d = JSON.parse(m[1]);
       d.sources = cleanSources_(d.sources);
       d.correction = cleanCorrection_(d.correction);
-      files.push({ path: path, text: buildPage_(d, canonical) });
+      files.push({ path: path, text: buildPage_(d, canonical, noindex) });
       Logger.log('재생성: ' + path + ' (' + files.length + ')');
     }
     redo('index.html', SITE + '/');
     list.forEach(function (e) {
-      redo('archive/' + e.slug + '.html', SITE + '/archive/' + e.slug + '.html');
+      redo('archive/' + e.slug + '.html', SITE + '/archive/' + e.slug + '.html', !indexed_(e.slug, list));
     });
     files.push({ path: 'about.html', text: aboutPage_() });
     files.push({ path: 'privacy.html', text: privacyPage_() });
