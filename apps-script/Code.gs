@@ -490,6 +490,17 @@ function calKey_(when, stamp) {
 }
 
 /** 이번 주 증시 일정 페이지. 최신 브리핑의 cal로 매 회차 다시 만든다. */
+/** 일정 페이지 제목: "11/2~11/8 증시 일정: 미국 중간선거·비농업 고용보고서" (첫 일정 날짜부터 7일, 별이 가장 많은 일정 2개). 일정이 없으면 "이번 주 증시 일정". */
+function calTitle_(d) {
+  var rows = ((d.cal && d.cal.rows) || []).map(function (r) { return r.c; }), m = rows.length && /(\d{1,2})\/(\d{1,2})/.exec(rows[0][0]), y = /(\d{4})/.exec(d.stamp || '');
+  if (!m || !y) return '이번 주 증시 일정';
+  var a = new Date(Date.UTC(+y[1], +m[1] - 1, +m[2])), b = new Date(a.getTime() + 6 * 864e5);
+  var md = function (x) { return (x.getUTCMonth() + 1) + '/' + x.getUTCDate(); };
+  var stars = function (c) { return (String(c[2] || '').match(/★/g) || []).length; };
+  var top = rows.map(function (c, i) { return [stars(c), -i, c[1]]; }).sort(function (p, q) { return q[0] - p[0] || q[1] - p[1]; }).slice(0, 2).map(function (x) { return x[2]; });
+  return md(a) + '~' + md(b) + ' 증시 일정' + (top.length ? ': ' + top.join('·') : '');
+}
+
 function calendarPage_(d) {
   var sm = /(\d{4})\/(\d{2})\/(\d{2})\D+(\d{2}):(\d{2})/.exec(d.stamp || ''), now = sm ? +(sm[1] + sm[2] + sm[3] + sm[4] + sm[5]) : 0;
   var rows = ((d.cal && d.cal.rows) || []).filter(function (r) { var k = calKey_(r.c[0], d.stamp); return !k || k >= now; }).map(function (r) {
@@ -498,8 +509,9 @@ function calendarPage_(d) {
       (u ? ' <a class="cal-add" href="' + esc_(u) + '" target="_blank" rel="noopener">캘린더에 추가</a>' : '') + '</p>' +
       '<p class="cal-ev">' + esc_(c[1]) + '</p>' + (c[3] ? '<p class="cal-imp">' + esc_(c[3]) + '</p>' : '') + '</li>';
   }).join('');
-  return simplePage_('이번 주 증시 일정', '/calendar.html',
-    '<h1>이번 주 증시 일정</h1><p>' + esc_(d.short) + ' 브리핑 기준 향후 7일 국내외 주요 일정입니다. 캘린더에 추가를 누르면 내 구글 캘린더에 일정이 들어갑니다.</p>' +
+  var title = calTitle_(d);
+  return simplePage_(title, '/calendar.html',
+    '<h1>' + esc_(title) + '</h1><p>' + esc_(d.short) + ' 브리핑 기준 향후 7일 국내외 주요 일정입니다. 캘린더에 추가를 누르면 내 구글 캘린더에 일정이 들어갑니다.</p>' +
     (rows ? '<ul class="cal-list">' + rows + '</ul>'
           : '<p>등록된 일정이 없습니다.</p>') +
     (d.calNote ? '<p class="pre-m">' + esc_(d.calNote) + '</p>' : '') +
@@ -758,7 +770,7 @@ function archiveIndex_(list) {
 
 function sitemap_(list, weeks) {
   weeks = weeks || [];
-  var urls = ['/', '/about.html', '/privacy.html', '/archive/', '/contact.html', '/calendar.html', '/glossary.html'].concat(weeks.length ? ['/weekly/'] : []).concat(weeks.map(function (w) { return '/weekly/' + w.slug + '.html'; })).concat(GLOSSARY.map(function (g) { return '/glossary/' + g[0] + '.html'; })).concat(list.filter(function (e) { return indexed_(e.slug, list); }).map(function (e) { return '/archive/' + e.slug + '.html'; }));
+  var urls = ['/', '/about.html', '/privacy.html', '/archive/', '/contact.html', '/calendar.html', '/glossary.html', '/regime.html'].concat(weeks.length ? ['/weekly/'] : []).concat(weeks.map(function (w) { return '/weekly/' + w.slug + '.html'; })).concat(GLOSSARY.map(function (g) { return '/glossary/' + g[0] + '.html'; })).concat(list.filter(function (e) { return indexed_(e.slug, list); }).map(function (e) { return '/archive/' + e.slug + '.html'; }));
   var day = function (slug) { return slug.slice(0, 4) + '-' + slug.slice(4, 6) + '-' + slug.slice(6, 8); };
   var mod = { '/': list[0] && day(list[0].slug), '/archive/': list[0] && day(list[0].slug), '/calendar.html': list[0] && day(list[0].slug) };
   list.forEach(function (e) { mod['/archive/' + e.slug + '.html'] = day(e.slug); });
@@ -811,7 +823,8 @@ function regimeFiles_() {
       g.name = x[0];
       return g;
     });
-    return [{ path: 'regime.json', text: JSON.stringify({ updated: Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm'), idx: out }) }];
+    var j = { updated: Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm'), idx: out };
+    return [{ path: 'regime.json', text: JSON.stringify(j) }, { path: 'regime.html', text: regimePage_(j) }];
   } catch (e) {
     Logger.log('regime 건너뜀: ' + e);
     return [];
@@ -823,6 +836,27 @@ function regimeFiles_() {
  * 전환 조짐 3가지: 종가와 slow일선, fast일선과 slow일선(골든·데드크로스), 고점·저점에서 10% 이상 움직임.
  * 하락장에서 앞의 둘 이상이 상승 쪽이면 "상승 전환 조짐", 상승장에서 둘 이상이 하락 쪽이면 "하락 전환 조짐".
  */
+/** 상승장·하락장 페이지(/regime.html): 지수별 현재 국면, 전환 신호, 최근 5년 국면 기록표. 첫 화면 큰 흐름 상자의 자세히 보기. */
+function regimePage_(j) {
+  var kr = { bull: '상승장', bear: '하락장' }, days = function (a, b) { return Math.round((Date.parse(b) - Date.parse(a)) / 864e5); };
+  var body = '<h1>상승장·하락장 국면</h1><p>코스피·코스닥·S&amp;P 500·나스닥이 지금 상승장인지 하락장인지, 언제부터였는지를 지수 종가로 정리합니다. ' + esc_(j.idx[0] && j.idx[0].asof) + ' 종가 기준이며 브리핑이 올라갈 때마다 다시 계산합니다.</p>';
+  j.idx.forEach(function (g) {
+    if (!g.state) return;
+    var b = g.bands || [], on = g.signs.filter(function (x) { return x.on; }).length;
+    body += '<h2>' + esc_(g.name) + ': ' + kr[g.state] + '</h2><p>' + esc_(g.since) + (g.state === 'bull' ? ' 저점' : ' 고점') + '부터 ' + kr[g.state] + '입니다(' + days(g.since, g.asof) + '일째, 기준 ' + g.cut + '%). ' +
+      (g.turn ? (g.turn === 'up' ? '상승' : '하락') + ' 전환 조짐이 있습니다.' : '전환 조짐은 약합니다.') + ' 반대쪽 신호 ' + on + '/' + g.signs.length + ': ' +
+      g.signs.map(function (x) { return esc_(x.t) + (x.on ? '(켜짐)' : ''); }).join(', ') + '.</p>' +
+      '<div class="pre" style="padding:0">' + tbl_({ head: ['시작', '국면', '기간'], rows: b.slice().reverse().map(function (x, i, r) {
+        var end = i === 0 ? g.asof : r[i - 1][0];
+        return { c: [x[0], kr[x[1]], days(x[0], end) + '일' + (i === 0 ? ' (진행 중)' : '')] };
+      }) }) + '</div>';
+  });
+  body += '<h2>어떻게 나누나요</h2><p>지수가 직전 고점에서 기준 이상 떨어지면 그 고점부터 하락장, 직전 저점에서 기준 이상 오르면 그 저점부터 상승장으로 봅니다. 기준은 한국 지수 15%, 미국 지수 20%로, 지난 20년 지수에 여러 기준을 대 보고 실제 큰 상승·하락기를 가장 잘 나눈 값입니다.</p>' +
+    '<p>전환 조짐은 세 가지를 봅니다. 종가가 200일 이동평균선 위인지, 50일선이 200일선 위인지, 고점·저점에서 10% 넘게 움직였는지입니다. 이 중 2가지 이상이 지금 국면의 반대쪽을 가리키면 전환 조짐으로 표시합니다.</p>' +
+    '<p class="pre-m">지난 흐름을 정리한 것이며 앞으로의 방향을 예측하거나 매매를 권하는 것이 아닙니다. 데이터: Yahoo Finance 일별 종가(최근 5년). 오늘 시장 해설은 <a href="/">최신 브리핑</a>에 있습니다.</p>';
+  return simplePage_('상승장·하락장 국면', '/regime.html', body, '코스피·코스닥·S&P 500·나스닥 지금 상승장일까 하락장일까: 언제부터인지, 전환 신호, 최근 5년 국면 기록');
+}
+
 function regimeOf_(dates, closes, fast, slow, cut) {
   var dn = 1 - cut / 100, up = 1 + cut / 100;
   // 구간 시작일은 기준을 넘은 날이 아니라 그 앞의 고점(하락장)·저점(상승장) 날짜.
