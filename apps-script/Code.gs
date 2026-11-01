@@ -168,6 +168,18 @@ function weekendSkip_(slot) {
 /** 갱신 시각 키의 요일: '1' 월 … '6' 토, '7' 일 */
 function weekday_(slot) { return Utilities.formatDate(new Date(slot.slice(0, 10) + 'T12:00:00+09:00'), TZ, 'u'); }
 
+/** 운영자 한마디 기본 문구(weekly/comment.txt가 비었을 때): Mus 말투로 그 주 숫자만 넣는다. 지어낸 해석은 넣지 않는다. */
+function weeklyNote_(rows, top) {
+  var get = function (k) { return rows.filter(function (r) { return r.c[0] === k; })[0]; };
+  var pct = function (r) { return r ? parseFloat(r.c[3]) : NaN; };
+  var k = get('코스피'), q = get('나스닥'), t = '섬개미입니다. 이번주 주요 시황 및 뉴스입니다.';
+  if (k && !isNaN(pct(k))) t += ' 코스피는 한 주 동안 ' + k.c[3] + '(' + k.c[1] + ' → ' + k.c[2] + ')' + (q && !isNaN(pct(q)) ? ', 나스닥은 ' + q.c[3] : '') + ' 움직였습니다.';
+  var big = rows.filter(function (r) { return !/10년물/.test(r.c[0]) && !isNaN(pct(r)); }).sort(function (a, b) { return Math.abs(pct(b)) - Math.abs(pct(a)); })[0];
+  if (big) t += ' 가장 크게 움직인 지표는 ' + big.c[0] + '(' + big.c[3] + ')입니다.';
+  if (top.length) t += ' 브리핑에 가장 많이 나온 종목은 ' + top.slice(0, 2).join('·') + '입니다.';
+  return t + ' 다음 주도 같이 지켜봐요.';
+}
+
 /** 토요일 08:00 회차: 월요일 아침~토요일 아침 회차를 묶은 주간 정리 페이지(/weekly/yyyyMMdd.html)와 목록.
  *  운영자 한마디는 저장소 weekly/comment.txt에서 읽고, 쓴 뒤에는 비운다(다음 주에 같은 글이 또 나오지 않게). */
 function weeklyFiles_(list, weeks, comment) {
@@ -186,9 +198,10 @@ function weeklyFiles_(list, weeks, comment) {
   wk.forEach(function (e) { (e.stocks || []).forEach(function (x) { freq[x] = (freq[x] || 0) + 1; }); });
   var top = Object.keys(freq).sort(function (x, y) { return freq[y] - freq[x]; }).slice(0, 10);
   var days = wk.filter(function (e) { return indexed_(e.slug, list); }).reverse();
+  var note = comment && comment.trim() ? comment.trim() : weeklyNote_(rows, top);
   var body = '<p><a href="/weekly/">← 주간 정리 목록</a></p><h1>' + esc_(title) + '</h1>' +
     '<p>' + md(mon) + '(월) 아침부터 ' + md(d) + '(토) 아침까지 올라간 브리핑 ' + wk.length + '개 회차를 한 페이지로 묶었습니다.</p>' +
-    (comment && comment.trim() ? '<h2>운영자 한마디</h2><p>' + esc_(comment.trim()).replace(/\n/g, '<br>') + '</p><p class="pre-m">— 무스비</p>' : '') +
+    '<h2>운영자 한마디</h2><p>' + esc_(note).replace(/\n/g, '<br>') + '</p>' +
     '<h2>한 주 지표 변화</h2><div class="pre" style="padding:0">' + tbl_({ head: ['지표', md(first.slug) + ' 아침', md(d) + ' 아침', '주간 변화'], rows: rows }) + '</div>' +
     '<p class="pre-m">월요일 아침 값은 직전 금요일 마감, 토요일 아침 값은 이번 주 금요일 마감 기준입니다. 정확한 기준 시점은 각 날짜의 브리핑에 있습니다.</p>' +
     '<h2>날짜별 핵심 뉴스</h2><ul>' + days.map(function (e) { return '<li><a href="/archive/' + esc_(e.slug) + '.html">' + esc_(md(e.slug)) + '</a> ' + esc_(e.sub) + '</li>'; }).join('') + '</ul>' +
