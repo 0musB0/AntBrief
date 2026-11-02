@@ -126,7 +126,8 @@ function publish() {
         return;
       }
       var list = readRepoJson_('archive/list.json') || [];
-      if (list[0] && list[0].sub === a.sub) { f.setName('[중복] ' + f.getName()); return; } // 직전 회차와 제목이 같으면 올리지 않고 더 새 파일을 기다린다
+      // 같은 날 직전 회차와 제목이 같으면 올리지 않고 더 새 파일을 기다린다. 날짜가 바뀐 첫 회차는 제목이 같아도 올린다(주말 뒤 월요일 08시가 막혔던 일, 11/02)
+      if (list[0] && list[0].sub === a.sub && list[0].slug.slice(0, 8) === slugOf_(a.stamp).slice(0, 8)) { f.setName('[중복] ' + f.getName()); return; }
       var data = merge_(a, s);
       liveMarket_(data.market);
       var slug = slugOf_(data.stamp);
