@@ -144,7 +144,7 @@ function publish() {
         { path: 'calendar.html', text: calendarPage_(data) },
         { path: 'sitemap.xml', text: sitemap_(list, weeks) },
         { path: 'feed.xml', text: feedXml_(list) }
-      ].concat(termFiles_(list), regimeFiles_(), weekFiles), 'briefing ' + data.short + (job.kind === 'gemini' ? ' (gemini)' : ''));
+      ].concat(termFiles_(list), regimeFiles_(), compareFiles_(), weekFiles), 'briefing ' + data.short + (job.kind === 'gemini' ? ' (gemini)' : ''));
       props.setProperty('LAST_SLOT', slot);
       if (job.kind === 'gemini') { f.setName('[배포완료] ' + f.getName()); a.spark_id = null; }
       cleanup_(a.spark_id); // gemini 경로면 spark_id가 null이라 방금 배포한 파일은 24시간 뒤 정리에서 지워짐
@@ -623,6 +623,8 @@ var NAV = '<nav class="top-nav" aria-label="주요 메뉴"><a class="brand" href
 var HEAD_COMMON =
   '<meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">' +
   '<meta name="naver-site-verification" content="6f1a5691b1db9606b974454d51daddd897c24c0b">' +
+  '<script defer src="/_vercel/insights/script.js"></script>' + // Vercel Web Analytics(쿠키 없음). 대시보드에서 켜야 집계됨
+
   '<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#15171a"><link rel="apple-touch-icon" href="/icon-512.png">' +
   '<link rel="icon" type="image/png" href="/favicon.png"><link rel="shortcut icon" href="/favicon.ico">' +
   '<link rel="alternate" type="application/rss+xml" title="섬개미 증시 브리핑" href="/feed.xml">' +
@@ -771,7 +773,7 @@ function privacyPage_() {
   return simplePage_('개인정보처리방침', '/privacy.html',
     '<h1>개인정보처리방침</h1><p>시행일: 2026년 10월 6일</p>' +
     '<h2>1. 수집하는 개인정보</h2><p>이 사이트는 회원가입, 로그인, 댓글 기능이 없으며 이용자에게 개인정보를 직접 입력받지 않습니다.</p>' +
-    '<h2>2. 자동으로 수집되는 정보</h2><p>사이트 호스팅 업체(Vercel)는 서비스 운영과 보안을 위해 접속 IP, 브라우저 정보, 접속 시각 등의 접속 기록을 처리할 수 있습니다.</p>' +
+    '<h2>2. 자동으로 수집되는 정보</h2><p>사이트 호스팅 업체(Vercel)는 서비스 운영과 보안을 위해 접속 IP, 브라우저 정보, 접속 시각 등의 접속 기록을 처리할 수 있습니다. 방문 통계는 Vercel Web Analytics로 쿠키 없이 페이지 조회 수와 유입 경로만 집계합니다.</p>' +
     '<h2>3. 쿠키와 광고</h2><p>이 사이트는 Google 애드센스 광고를 게재합니다. Google을 포함한 제3자 공급업체는 쿠키를 사용하여 이용자의 이 사이트 및 다른 사이트 방문 기록을 바탕으로 광고를 게재합니다. Google은 광고 쿠키를 사용하여 이용자의 방문 기록에 기반한 광고를 게재할 수 있습니다.</p>' +
     '<p>이용자는 <a href="https://adssettings.google.com/" rel="nofollow noopener" target="_blank">Google 광고 설정</a>에서 맞춤 광고를 사용 중지할 수 있으며, <a href="https://www.aboutads.info/" rel="nofollow noopener" target="_blank">www.aboutads.info</a>에서 제3자 공급업체의 맞춤 광고 쿠키를 사용 중지할 수 있습니다. 브라우저 설정에서 쿠키 저장을 거부할 수도 있습니다.</p>' +
     '<h2>4. 개인정보의 제3자 제공</h2><p>이 사이트는 이용자의 개인정보를 제3자에게 판매하거나 제공하지 않습니다.</p>' +
@@ -801,7 +803,7 @@ function archiveIndex_(list) {
 
 function sitemap_(list, weeks) {
   weeks = weeks || [];
-  var urls = ['/', '/about.html', '/privacy.html', '/archive/', '/contact.html', '/calendar.html', '/glossary.html', '/regime.html'].concat(weeks.length ? ['/weekly/'] : []).concat(weeks.map(function (w) { return '/weekly/' + w.slug + '.html'; })).concat(GLOSSARY.map(function (g) { return '/glossary/' + g[0] + '.html'; })).concat(list.filter(function (e) { return indexed_(e.slug, list); }).map(function (e) { return '/archive/' + e.slug + '.html'; }));
+  var urls = ['/', '/about.html', '/privacy.html', '/archive/', '/contact.html', '/calendar.html', '/glossary.html', '/regime.html', '/compare.html'].concat(weeks.length ? ['/weekly/'] : []).concat(weeks.map(function (w) { return '/weekly/' + w.slug + '.html'; })).concat(GLOSSARY.map(function (g) { return '/glossary/' + g[0] + '.html'; })).concat(list.filter(function (e) { return indexed_(e.slug, list); }).map(function (e) { return '/archive/' + e.slug + '.html'; }));
   var day = function (slug) { return slug.slice(0, 4) + '-' + slug.slice(4, 6) + '-' + slug.slice(6, 8); };
   var mod = { '/': list[0] && day(list[0].slug), '/archive/': list[0] && day(list[0].slug), '/calendar.html': list[0] && day(list[0].slug) };
   list.forEach(function (e) { mod['/archive/' + e.slug + '.html'] = day(e.slug); });
@@ -838,6 +840,44 @@ function testRegime() {
 }
 
 /** 브리핑 배포 때 같이 올릴 regime.json. 받아오기에 실패하면 빈 배열(직전 파일 유지). */
+/** 편집기 확인용: 20년 비교 페이지를 만들어 앞부분을 로그로 본다(커밋은 안 함). */
+function testCompare() { var f = compareFiles_(); Logger.log(f.length ? f[0].text.slice(0, 3000) : '실패(로그 확인)'); }
+
+/** Yahoo 월봉(전체 기간)에서 연도별 마지막 종가. { '2025': 2399.5, ... } */
+function yearEnd_(sym) {
+  var r = UrlFetchApp.fetch('https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(sym) + '?range=max&interval=1mo',
+    { muteHttpExceptions: true, headers: { 'User-Agent': 'Mozilla/5.0' } });
+  if (r.getResponseCode() !== 200) throw new Error(sym + ' ' + r.getResponseCode());
+  var res = JSON.parse(r.getContentText()).chart.result[0], cl = res.indicators.quote[0].close, out = {};
+  res.timestamp.forEach(function (t, i) { if (cl[i] != null) out[Utilities.formatDate(new Date(t * 1000), TZ, 'yyyy')] = cl[i]; });
+  return out;
+}
+
+/** 코스피·원/달러 최근 20년 연말 값 비교 페이지(/compare.html). 숫자만 계산하고 해석은 붙이지 않는다. 실패하면 건너뛴다. */
+function compareFiles_() {
+  try {
+    var k = yearEnd_('^KS11'), w = yearEnd_('KRW=X'), now = Utilities.formatDate(new Date(), TZ, 'yyyy');
+    var years = Object.keys(k).filter(function (y) { return w[y] && k[String(y - 1)] && w[String(y - 1)]; }).sort().slice(-20);
+    if (years.length < 5) throw new Error('데이터 부족 ' + years.length);
+    var pct = function (a, b) { var v = (b / a - 1) * 100; return (v >= 0 ? '+' : '') + v.toFixed(1) + '%'; };
+    var both = 0, kUp = 0;
+    var rows = years.slice().reverse().map(function (y) {
+      var kc = k[y] / k[String(y - 1)] - 1, wc = w[y] / w[String(y - 1)] - 1;
+      if (kc > 0) { kUp++; if (wc < 0) both++; }
+      return { c: [y + (y === now ? ' (진행 중)' : ''), num_(k[y]), pct(k[String(y - 1)], k[y]), num_(w[y]), pct(w[String(y - 1)], w[y])] };
+    });
+    var body = '<h1>코스피와 원/달러 20년 비교</h1><p>최근 ' + years.length + '년 동안 해마다 연말 코스피와 원/달러 환율, 그리고 한 해 동안의 변화율입니다. 올해 값은 ' + Utilities.formatDate(new Date(), TZ, 'M/d') + ' 기준입니다.</p>' +
+      '<p>이 기간 코스피가 오른 해는 ' + kUp + '번이고, 그중 원/달러가 내린(원화 강세) 해는 ' + both + '번입니다.</p>' +
+      '<div class="pre" style="padding:0">' + tbl_({ head: ['연도', '코스피(연말)', '코스피 변화', '원/달러(연말)', '원/달러 변화'], rows: rows }) + '</div>' +
+      '<p class="pre-m">원/달러가 오르면 원화 가치가 떨어진 것(원화 약세)입니다. 데이터: Yahoo Finance 월말 종가(^KS11, KRW=X). 지난 기록을 정리한 것이며 앞으로의 방향을 예측하거나 매매를 권하는 것이 아닙니다.</p>' +
+      '<p>지금 국면은 <a href="/regime.html">상승장·하락장 국면</a>, 오늘 시장은 <a href="/">최신 브리핑</a>에서 볼 수 있습니다.</p>';
+    return [{ path: 'compare.html', text: simplePage_('코스피와 원/달러 20년 비교', '/compare.html', body, '코스피와 원/달러 환율 최근 20년 연말 값과 연간 변화율 비교표') }];
+  } catch (e) {
+    Logger.log('compare 건너뜀: ' + e);
+    return [];
+  }
+}
+
 function regimeFiles_() {
   try {
     var out = REGIME_INDEX.map(function (x) {
@@ -884,7 +924,7 @@ function regimePage_(j) {
   });
   body += '<h2>어떻게 나누나요</h2><p>지수가 직전 고점에서 기준 이상 떨어지면 그 고점부터 하락장, 직전 저점에서 기준 이상 오르면 그 저점부터 상승장으로 봅니다. 기준은 한국 지수 15%, 미국 지수 20%로, 지난 20년 지수에 여러 기준을 대 보고 실제 큰 상승·하락기를 가장 잘 나눈 값입니다.</p>' +
     '<p>전환 조짐은 세 가지를 봅니다. 종가가 200일 이동평균선 위인지, 50일선이 200일선 위인지, 고점·저점에서 10% 넘게 움직였는지입니다. 이 중 2가지 이상이 지금 국면의 반대쪽을 가리키면 전환 조짐으로 표시합니다.</p>' +
-    '<p class="pre-m">지난 흐름을 정리한 것이며 앞으로의 방향을 예측하거나 매매를 권하는 것이 아닙니다. 데이터: Yahoo Finance 일별 종가(최근 5년). 오늘 시장 해설은 <a href="/">최신 브리핑</a>에 있습니다.</p>';
+    '<p class="pre-m">지난 흐름을 정리한 것이며 앞으로의 방향을 예측하거나 매매를 권하는 것이 아닙니다. 데이터: Yahoo Finance 일별 종가(최근 5년). 오늘 시장 해설은 <a href="/">최신 브리핑</a>, 긴 흐름은 <a href="/compare.html">코스피와 원/달러 20년 비교</a>에 있습니다.</p>';
   return simplePage_('상승장·하락장 국면', '/regime.html', body, '코스피·코스닥·S&P 500·나스닥 지금 상승장일까 하락장일까: 언제부터인지, 전환 신호, 최근 5년 국면 기록');
 }
 
