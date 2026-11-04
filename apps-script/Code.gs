@@ -327,7 +327,7 @@ function merge_(a, s) {
       return { c: [c.when, c.event, r[1], r[2]] };
     }
     return { c: r.slice(0, 4) };
-  });
+  }).filter(function (r) { return !pastCal_(r.c[0], a.stamp); }); // 이미 지난 일정은 메인 표·일정 페이지 모두에서 뺀다
   return clean_({
     stamp: a.stamp, short: a.short, sub: a.sub, lead: a.lead,
     commentary: (a.commentary || []).slice(0, 6),
@@ -499,8 +499,8 @@ function gcal_(when, event, stamp) {
 function calKey_(when, stamp) {
   var m = /(\d{1,2})\/(\d{1,2})/.exec(when || '');
   if (!m) return 0;
-  var y = +String(stamp).slice(0, 4), mo = +m[1];
-  if (mo < +String(stamp).slice(5, 7) - 6) y++;
+  var y = +String(stamp).slice(0, 4), mo = +m[1], sm = +String(stamp).slice(5, 7);
+  if (mo < sm - 6) y++; else if (mo > sm + 6) y--; // 12월 브리핑의 1월 일정 / 1월 브리핑의 12월 일정
   var t = /(\d{1,2}):(\d{2})/.exec(String(when).slice(m.index + m[0].length));
   return ((y * 100 + mo) * 100 + +m[2]) * 10000 + (t ? +t[1] * 100 + +t[2] : 2359);
 }
@@ -517,9 +517,14 @@ function calTitle_(d) {
   return md(a) + '~' + md(b) + ' 증시 일정' + (top.length ? ': ' + top.join('·') : '');
 }
 
+/** 일정 시각이 브리핑 기준 시각(stamp)보다 앞서면 true. 날짜를 못 읽으면 false(남겨 둔다). */
+function pastCal_(when, stamp) {
+  var sm = /(\d{4})\/(\d{2})\/(\d{2})\D+(\d{2}):(\d{2})/.exec(stamp || ''), k = calKey_(when, stamp);
+  return !!(sm && k) && k < +(sm[1] + sm[2] + sm[3] + sm[4] + sm[5]);
+}
+
 function calendarPage_(d) {
-  var sm = /(\d{4})\/(\d{2})\/(\d{2})\D+(\d{2}):(\d{2})/.exec(d.stamp || ''), now = sm ? +(sm[1] + sm[2] + sm[3] + sm[4] + sm[5]) : 0;
-  var rows = ((d.cal && d.cal.rows) || []).filter(function (r) { var k = calKey_(r.c[0], d.stamp); return !k || k >= now; }).map(function (r) {
+  var rows = ((d.cal && d.cal.rows) || []).map(function (r) {
     var c = r.c, u = gcal_(c[0], c[1], d.stamp);
     return '<li class="cal-item"><p class="cal-when"><b>' + esc_(c[0]) + '</b> <span class="cal-star">' + esc_(c[2]) + '</span>' +
       (u ? ' <a class="cal-add" href="' + esc_(u) + '" target="_blank" rel="noopener">캘린더에 추가</a>' : '') + '</p>' +
